@@ -21,6 +21,7 @@
 #include <linux/watchdog.h>
 #include <linux/poll.h>
 #include <linux/mei.h>
+#include <linux/mei_bus.h>
 
 #include "hw.h"
 #include "hw-me-regs.h"
@@ -261,6 +262,29 @@ struct mei_hw_ops {
 	u32 (*read_hdr)(const struct mei_device *dev);
 	int (*read) (struct mei_device *dev,
 		     unsigned char *buf, unsigned long len);
+};
+
+/**
+ * mei_bus_client
+ *
+ * @uuid: me client uuid
+ * @name: client symbolic name
+ * @me_dev: mei device
+ * @cl: mei client
+ * @driver: mei bus driver for this client
+ * @dev: linux driver model device pointer
+ * @priv_data: client private data
+ */
+struct mei_bus_client {
+	uuid_le uuid;
+	char name[MEI_NAME_SIZE];
+
+	struct mei_device *mei_dev;
+	struct mei_cl *cl;
+	struct mei_bus_driver *driver;
+	struct device dev;
+
+	void *priv_data;
 };
 
 /**

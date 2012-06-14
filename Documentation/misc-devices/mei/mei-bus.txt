@@ -1,0 +1,137 @@
+Intel(R) Management Engine (ME) bus API
+=======================================
+
+
+Rationale
+=========
+While a misc character device is useful for applications to send and receive
+data to the many IP blocks found in Intel's ME, kernel drivers rely on the
+device model to be probed.
+By adding a kernel virtual bus abstraction on top of the MEI driver we can
+implement drivers for the various MEI features as standalone ones, found in
+their respective subsystem. Existing drivers can even potentially be re-used
+by adding an MEI bus layer to the existing code.
+
+
+MEI bus API
+===========
+A driver implementation for an MEI IP block is very similar to existing bus
+based device drivers. The driver registers itself as an MEI bus driver through
+the mei_bus_driver structure:
+
+struct mei_bus_driver {
+	struct device_driver driver;
+
+	struct mei_id id;
+
+	int (*probe)(struct mei_bus_client *client);
+	int (*remove)(struct mei_bus_client *client);
+};
+
+struct mei_id {
+	char name[MEI_NAME_SIZE];
+	uuid_le uuid;
+};
+
+The mei_id structure allows the driver to bind itself against an ME UUID and a
+device name. There typically is one ME UUID per technology and the mei_id name
+field matches a specific device name within that technology. As an example,
+the ME supports several NFC devices: All of them have the same ME UUID but the
+ME bus code will assign each of them a different name.
+
+To actually register a driver on the ME bus one must call the mei_add_driver()
+API. This is typically called at module init time.
+
+Once registered on the ME bus, a driver will typically try to do some I/O on
+this bus and this should be done through the mei_bus_send() and mei_bus_recv()
+routines. The latter is synchronous (blocks and sleeps until data shows up).
+In order for drivers to be notified of pending events waiting for them (e.g.
+an Rx event) they can register an event handler through the
+mei_bus_register_event_cb() routine. Currently only the MEI_BUS_EVENT_RX event
+will trigger an event handler call and the driver implementation is supposed
+to call mei_bus_recv() from the event handler in order to fetch the pending
+received buffers.
+
+
+Example
+=======
+As a theoretical example let's pretend the ME comes with a "contact" NFC IP.
+The driver init and exit routines for this device would look like:
+
+#define CONTACT_DRIVER_NAME "contact"
+
+#define NFC_UUID UUID_LE(0x0bb17a78, 0x2a8e, 0x4c50, 0x94, \
+			       0xd4, 0x50, 0x26, 0x67, 0x23, 0x77, 0x5c)
+
+static struct mei_bus_driver contact_driver = {
+	.driver = {
+		   .name = CONTAC_DRIVER_NAME,
+		  },
+	.id = {
+		.name = CONTACT_DRIVER_NAME,
+		.uuid = NFC_UUID,
+	},
+
+	.probe = contact_probe,
+	.remove = contact_remove,
+};
+
+static int contact_init(void)
+{
+	int r;
+
+	pr_debug(DRIVER_DESC ": %s\n", __func__);
+
+	r = mei_add_driver(&contact_driver);
+	if (r) {
+		pr_err(CONTACT_DRIVER_NAME ": driver registration failed\n");
+		return r;
+	}
+
+	return 0;
+}
+
+static void __exit contact_exit(void)
+{
+	mei_del_driver(&contact_driver);
+}
+
+module_init(contact_init);
+module_exit(contact_exit);
+
+And the driver's simplified probe routine would look like that:
+
+int contact_probe(struct mei_bus_client *client)
+{
+	struct contact_driver *contact;
+
+	[...]
+	mei_bus_register_event_cb(client, contact_event_cb, contact);
+
+	return 0;
+ }
+
+In the probe routine the driver basically registers an ME bus event handler
+which is as close as it can get to registering a threaded IRQ handler.
+The handler implementation will typically call some I/O routine depending on
+the pending events:
+
+#define MAX_NFC_PAYLOAD
+
+static void contact_event_cb(struct mei_bus_client *client, u32 events,
+			     void *context)
+{
+	struct contact_driver *contact = context;
+
+	if (events & BIT(MEI_BUS_EVENT_RX)) {
+		u8 payload[MAX_NFC_PAYLOAD];
+		int payload_size;
+
+		payload_size = mei_bus_recv(client, payload, MAX_NFC_PAYLOAD);
+		if (payload_size <= 0)
+			return;
+
+		/* Hook to the NFC subsystem */
+		nfc_hci_recv_frame(contact->hdev, payload, payload_size);
+	}
+}
