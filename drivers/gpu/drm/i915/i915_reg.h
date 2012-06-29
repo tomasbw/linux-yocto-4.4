@@ -2548,6 +2548,14 @@
 #define DPD_AUX_CH_DATA4		0x64320
 #define DPD_AUX_CH_DATA5		0x64324
 
+#define PCH_DPB_AUX_CH_CTL		0xe4110
+#define PCH_DPC_AUX_CH_CTL		0xe4210
+#define PCH_DPD_AUX_CH_CTL		0xe4310
+
+#define PCH_DPB_AUX_CH_DATA		0xe4114
+#define PCH_DPC_AUX_CH_DATA		0xe4214
+#define PCH_DPD_AUX_CH_DATA		0xe4314
+
 #define   DP_AUX_CH_CTL_SEND_BUSY	    (1 << 31)
 #define   DP_AUX_CH_CTL_DONE		    (1 << 30)
 #define   DP_AUX_CH_CTL_INTERRUPT	    (1 << 29)
