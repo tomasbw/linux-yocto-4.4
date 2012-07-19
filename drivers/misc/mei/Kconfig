@@ -35,3 +35,10 @@ config INTEL_MEI_ME
 	  82Q33 Express
 	  82X38/X48 Express
 
+config INTEL_MEI_BUS_NFC
+        bool "MEI bus NFC support"
+        depends on INTEL_MEI
+	help
+	  When selecting this option the ME NFC device will be added to the
+	  MEI bus. This is needed by the NFC kernel subsystem for sending and
+	  receiving HCI frames to and from the NFC device.

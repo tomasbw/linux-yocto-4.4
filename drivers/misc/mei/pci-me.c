@@ -283,6 +283,8 @@ static void mei_remove(struct pci_dev *pdev)
 		dev->open_handle_count--;
 	mei_cl_unlink(&dev->iamthif_cl);
 
+	mei_nfc_host_exit();
+
 	dev->iamthif_current_cb = NULL;
 	dev->me_clients_num = 0;
 

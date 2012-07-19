@@ -11,5 +11,6 @@ mei-objs += main.o
 mei-objs += amthif.o
 mei-objs += wd.o
 mei-objs += bus.o
+mei-$(CONFIG_INTEL_MEI_BUS_NFC) += nfc.o
 mei-$(CONFIG_INTEL_MEI_ME) += pci-me.o
 mei-$(CONFIG_INTEL_MEI_ME) += hw-me.o
