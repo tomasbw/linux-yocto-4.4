@@ -197,6 +197,9 @@ static int mei_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	mei_pdev = pdev;
 	pci_set_drvdata(pdev, dev);
 
+	err = mei_bus_init(mei_pdev);
+	if (err)
+		goto deregister_mei;
 
 	schedule_delayed_work(&dev->timer_work, HZ);
 
@@ -206,6 +209,8 @@ static int mei_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	return 0;
 
+deregister_mei:
+	mei_deregister();
 release_irq:
 	mei_disable_interrupts(dev);
 	flush_scheduled_work();
@@ -300,6 +305,7 @@ static void mei_remove(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
 
+	mei_bus_exit();
 	mei_deregister();
 
 }

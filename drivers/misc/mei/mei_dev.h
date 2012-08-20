@@ -420,6 +420,10 @@ static inline unsigned long mei_secs_to_jiffies(unsigned long sec)
 	return msecs_to_jiffies(sec * MSEC_PER_SEC);
 }
 
+void mei_bus_rx_event(struct mei_cl *cl);
+int mei_bus_init(struct pci_dev *pdev);
+void mei_bus_exit(void);
+
 
 /*
  * mei init function prototypes

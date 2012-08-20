@@ -429,3 +429,25 @@ int mei_bus_register_event_cb(struct mei_bus_client *client,
 	return 0;
 }
 EXPORT_SYMBOL(mei_bus_register_event_cb);
+
+void mei_bus_rx_event(struct mei_cl *cl)
+{
+	struct mei_bus_client *client = cl->client;
+
+	if (!client || !client->event_cb)
+		return;
+
+	set_bit(MEI_BUS_EVENT_RX, &client->events);
+
+	schedule_work(&client->event_work);
+}
+
+int mei_bus_init(struct pci_dev *pdev)
+{
+	return bus_register(&mei_bus_type);
+}
+
+void mei_bus_exit(void)
+{
+	bus_unregister(&mei_bus_type);
+}
