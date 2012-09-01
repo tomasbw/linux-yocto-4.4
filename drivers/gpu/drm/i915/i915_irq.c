@@ -1838,6 +1838,11 @@ static void ivybridge_irq_preinstall(struct drm_device *dev)
 	I915_WRITE(SDEIMR, 0xffffffff);
 	I915_WRITE(SDEIER, 0x0);
 	POSTING_READ(SDEIER);
+
+	/* Power management */
+	I915_WRITE(GEN6_PMIMR, 0xffffffff);
+	I915_WRITE(GEN6_PMIER, 0x0);
+	POSTING_READ(GEN6_PMIER);
 }
 
 static void valleyview_irq_preinstall(struct drm_device *dev)
