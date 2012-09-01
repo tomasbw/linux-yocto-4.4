@@ -1438,7 +1438,7 @@ static void i915_dump_device_info(struct drm_i915_private *dev_priv)
 #define DEV_INFO_FLAG(name) info->name ? #name "," : ""
 #define DEV_INFO_SEP ,
 	DRM_DEBUG_DRIVER("i915 device info: gen=%i, pciid=0x%04x flags="
-			 "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+			 "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 			 info->gen,
 			 dev_priv->dev->pdev->device,
 			 DEV_INFO_FLAGS);

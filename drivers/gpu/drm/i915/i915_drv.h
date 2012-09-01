@@ -349,6 +349,7 @@ struct intel_device_info {
 	u8 has_bsd_ring:1;
 	u8 has_blt_ring:1;
 	u8 has_llc:1;
+	u8 has_vebox_ring:1;
 };
 
 #define I915_PPGTT_PD_ENTRIES 512
@@ -1176,6 +1177,7 @@ struct drm_i915_file_private {
 
 #define HAS_BSD(dev)            (INTEL_INFO(dev)->has_bsd_ring)
 #define HAS_BLT(dev)            (INTEL_INFO(dev)->has_blt_ring)
+#define HAS_VEBOX(dev)          (INTEL_INFO(dev)->has_vebox_ring)
 #define HAS_LLC(dev)            (INTEL_INFO(dev)->has_llc)
 #define HAS_ELLC(dev)		(((struct drm_i915_private *)(dev)->dev_private)->mutable_info.has_ellc)
 #define I915_NEED_WT_DISPLAY(dev) (((dev)->pci_device == 0x0d32) || \
