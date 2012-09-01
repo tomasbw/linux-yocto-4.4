@@ -88,7 +88,7 @@ struct  intel_ring_buffer {
 				   u32 seqno);
 
 	u32		semaphore_register[I915_NUM_RINGS]; /*our mbox written by others */
-	u32		signal_mbox[2]; /* mboxes this ring signals to */
+	u32		signal_mbox[I915_NUM_RINGS]; /* mboxes this ring signals to */
 	/**
 	 * List of objects currently involved in rendering from the
 	 * ringbuffer.
