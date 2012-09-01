@@ -1815,6 +1815,31 @@ static void ironlake_irq_preinstall(struct drm_device *dev)
 	POSTING_READ(SDEIER);
 }
 
+static void ivybridge_irq_preinstall(struct drm_device *dev)
+{
+	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+
+	atomic_set(&dev_priv->irq_received, 0);
+
+	I915_WRITE(HWSTAM, 0xeffe);
+
+	/* XXX hotplug from PCH */
+
+	I915_WRITE(DEIMR, 0xffffffff);
+	I915_WRITE(DEIER, 0x0);
+	POSTING_READ(DEIER);
+
+	/* and GT */
+	I915_WRITE(GTIMR, 0xffffffff);
+	I915_WRITE(GTIER, 0x0);
+	POSTING_READ(GTIER);
+
+	/* south display irq */
+	I915_WRITE(SDEIMR, 0xffffffff);
+	I915_WRITE(SDEIER, 0x0);
+	POSTING_READ(SDEIER);
+}
+
 static void valleyview_irq_preinstall(struct drm_device *dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
@@ -2738,9 +2763,8 @@ void intel_irq_init(struct drm_device *dev)
 		dev->driver->enable_vblank = valleyview_enable_vblank;
 		dev->driver->disable_vblank = valleyview_disable_vblank;
 	} else if (IS_IVYBRIDGE(dev)) {
-		/* Share pre & uninstall handlers with ILK/SNB */
 		dev->driver->irq_handler = ivybridge_irq_handler;
-		dev->driver->irq_preinstall = ironlake_irq_preinstall;
+		dev->driver->irq_preinstall = ivybridge_irq_preinstall;
 		dev->driver->irq_postinstall = ivybridge_irq_postinstall;
 		dev->driver->irq_uninstall = ironlake_irq_uninstall;
 		dev->driver->enable_vblank = ivybridge_enable_vblank;
@@ -2748,7 +2772,7 @@ void intel_irq_init(struct drm_device *dev)
 	} else if (IS_HASWELL(dev)) {
 		/* Share interrupts handling with IVB */
 		dev->driver->irq_handler = ivybridge_irq_handler;
-		dev->driver->irq_preinstall = ironlake_irq_preinstall;
+		dev->driver->irq_preinstall = ivybridge_irq_preinstall;
 		dev->driver->irq_postinstall = ivybridge_irq_postinstall;
 		dev->driver->irq_uninstall = ironlake_irq_uninstall;
 		dev->driver->enable_vblank = ivybridge_enable_vblank;
