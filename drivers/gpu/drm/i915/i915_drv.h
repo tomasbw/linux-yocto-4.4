@@ -321,6 +321,7 @@ struct drm_i915_gt_funcs {
 	DEV_INFO_FLAG(supports_tv) DEV_INFO_SEP \
 	DEV_INFO_FLAG(has_bsd_ring) DEV_INFO_SEP \
 	DEV_INFO_FLAG(has_blt_ring) DEV_INFO_SEP \
+	DEV_INFO_FLAG(has_vebox_ring) DEV_INFO_SEP \
 	DEV_INFO_FLAG(has_llc)
 
 struct intel_device_info {
@@ -348,8 +349,8 @@ struct intel_device_info {
 	u8 supports_tv:1;
 	u8 has_bsd_ring:1;
 	u8 has_blt_ring:1;
-	u8 has_llc:1;
 	u8 has_vebox_ring:1;
+	u8 has_llc:1;
 };
 
 #define I915_PPGTT_PD_ENTRIES 512
