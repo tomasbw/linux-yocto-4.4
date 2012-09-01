@@ -1733,7 +1733,7 @@ int intel_init_vebox_ring_buffer(struct drm_device *dev)
 	ring->flush = gen6_ring_flush;
 	ring->add_request = gen6_add_request;
 	ring->get_seqno = gen6_ring_get_seqno;
-	ring->irq_enable_mask = 0;
+	ring->irq_enable_mask = PM_VEBOX_USER_INTERRUPT | PM_VEBOX_CS_ERROR_INTERRUPT;
 	ring->irq_get = hsw_vebox_get_irq;
 	ring->irq_put = hsw_vebox_put_irq;
 	ring->dispatch_execbuffer = gen6_ring_dispatch_execbuffer;

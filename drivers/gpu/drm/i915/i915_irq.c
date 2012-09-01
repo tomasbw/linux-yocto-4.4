@@ -545,8 +545,15 @@ static void hsw_pm_irq_handler(struct drm_i915_private *dev_priv,
 	}
 	spin_unlock_irqrestore(&dev_priv->rps.lock, flags);
 
-	if (pm_iir & ~GEN6_PM_RPS_EVENTS)
-		DRM_ERROR("Unexpected PM interrupted\n");
+	if (pm_iir & ~GEN6_PM_RPS_EVENTS) {
+		if (pm_iir & PM_VEBOX_USER_INTERRUPT)
+			notify_ring(dev_priv->dev, &dev_priv->ring[VECS]);
+
+		if (pm_iir & PM_VEBOX_CS_ERROR_INTERRUPT) {
+			DRM_ERROR("PM error interrupt 0x%08x\n", pm_iir);
+			i915_handle_error(dev_priv->dev, false);
+		}
+	}
 }
 
 static irqreturn_t valleyview_irq_handler(int irq, void *arg)
@@ -2004,6 +2011,20 @@ static int ivybridge_irq_postinstall(struct drm_device *dev)
 	I915_WRITE(SDEIMR, dev_priv->pch_irq_mask);
 	I915_WRITE(SDEIER, hotplug_mask);
 	POSTING_READ(SDEIER);
+
+	I915_WRITE(GEN6_PMIIR, I915_READ(GEN6_PMIIR));
+	if (HAS_VEBOX(dev)) {
+		u32 pm_irqs, pmier, pmimr;
+		pm_irqs = PM_VEBOX_USER_INTERRUPT | PM_VEBOX_CS_ERROR_INTERRUPT;
+
+		/* Our enable/disable rps functions may touch these registers so
+		 * make sure to set a known state for only the non-RPS bits. */
+		pmier = (I915_READ(GEN6_PMIER) & GEN6_PM_RPS_EVENTS) | pm_irqs;
+		pmimr = (I915_READ(GEN6_PMIMR) | ~GEN6_PM_RPS_EVENTS) & ~pm_irqs;
+		I915_WRITE(GEN6_PMIMR, pmimr);
+		I915_WRITE(GEN6_PMIER, pmier);
+	}
+	POSTING_READ(GEN6_PMIER);
 
 	ironlake_enable_pch_hotplug(dev);
 
