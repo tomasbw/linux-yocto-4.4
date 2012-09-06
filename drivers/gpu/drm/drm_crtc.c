@@ -841,6 +841,35 @@ int drm_mode_create_tv_properties(struct drm_device *dev, int num_modes,
 }
 EXPORT_SYMBOL(drm_mode_create_tv_properties);
 
+static const struct drm_prop_enum_list expose_3d_modes_list[] =
+{
+	{ DRM_MODE_EXPOSE_3D_MODES_OFF, "Off" },
+	{ DRM_MODE_EXPOSE_3D_MODES_ON, "On" }
+};
+
+/**
+ * drm_mode_create_s3d_properties - create stereo 3D properties
+ * @dev: DRM device
+ *
+ * This functions create properties that are used by the stereo 3D code. Those
+ * properties must be attached to the desired connectors afterwards.
+ */
+int drm_mode_create_s3d_properties(struct drm_device *dev)
+{
+	struct drm_property *prop;
+
+	if (dev->mode_config.s3d_expose_modes_property)
+		return 0;
+
+	prop = drm_property_create_enum(dev, 0, "expose 3D modes",
+					expose_3d_modes_list,
+					ARRAY_SIZE(expose_3d_modes_list));
+	dev->mode_config.s3d_expose_modes_property = prop;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_mode_create_s3d_properties);
+
 /**
  * drm_mode_create_scaling_mode_property - create scaling mode property
  * @dev: DRM device
@@ -3172,11 +3201,15 @@ static int drm_mode_connector_set_obj_prop(struct drm_mode_object *obj,
 {
 	int ret = -EINVAL;
 	struct drm_connector *connector = obj_to_connector(obj);
+	struct drm_device *dev = connector->dev;
 
 	/* Do DPMS ourselves */
-	if (property == connector->dev->mode_config.dpms_property) {
+	if (property == dev->mode_config.dpms_property) {
 		if (connector->funcs->dpms)
 			(*connector->funcs->dpms)(connector, (int)value);
+		ret = 0;
+	} else if (property == dev->mode_config.s3d_expose_modes_property) {
+		connector->expose_3d_modes = value;
 		ret = 0;
 	} else if (connector->funcs->set_property)
 		ret = connector->funcs->set_property(connector, property, value);

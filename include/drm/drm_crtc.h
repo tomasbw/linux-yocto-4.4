@@ -576,6 +576,8 @@ struct drm_connector {
 	/* requested DPMS state */
 	int dpms;
 
+	int expose_3d_modes;
+
 	void *helper_private;
 
 	/* forced on connector */
@@ -801,6 +803,9 @@ struct drm_mode_config {
 	struct drm_property *tv_saturation_property;
 	struct drm_property *tv_hue_property;
 
+	/* Stereo 3D properties */
+	struct drm_property *s3d_expose_modes_property;
+
 	/* Optional properties */
 	struct drm_property *scaling_mode_property;
 	struct drm_property *dithering_mode_property;
@@ -950,6 +955,7 @@ extern int drm_property_add_enum(struct drm_property *property, int index,
 extern int drm_mode_create_dvi_i_properties(struct drm_device *dev);
 extern int drm_mode_create_tv_properties(struct drm_device *dev, int num_formats,
 				     char *formats[]);
+extern int drm_mode_create_s3d_properties(struct drm_device *dev);
 extern int drm_mode_create_scaling_mode_property(struct drm_device *dev);
 extern int drm_mode_create_dithering_property(struct drm_device *dev);
 extern int drm_mode_create_dirty_info_property(struct drm_device *dev);

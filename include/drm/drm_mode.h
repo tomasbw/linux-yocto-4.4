@@ -83,6 +83,10 @@
 #define DRM_MODE_DIRTY_ON       1
 #define DRM_MODE_DIRTY_ANNOTATE 2
 
+/* Expose 3D modes */
+#define DRM_MODE_EXPOSE_3D_MODES_OFF	0
+#define DRM_MODE_EXPOSE_3D_MODES_ON	1
+
 struct drm_mode_modeinfo {
 	__u32 clock;
 	__u16 hdisplay, hsync_start, hsync_end, htotal, hskew;
