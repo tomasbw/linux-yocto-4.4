@@ -1539,6 +1539,74 @@ do_cea_modes (struct drm_connector *connector, u8 *db, u8 len)
 	return modes;
 }
 
+static bool cea_hdmi_3d_present(u8 *hdmi)
+{
+	u8 len, skip = 0;
+
+	len = hdmi[0] & 0x1f;
+
+	if (len < 8)
+		return false;
+
+	/* no HDMI_Video_present */
+	if (!(hdmi[8] & (1<<5)))
+		return false;
+
+	/* Latency_fields_present */
+	if (hdmi[8] & (1 << 7))
+		skip += 2;
+
+	/* I_Latency_fields_present */
+	if (hdmi[8] & (1 << 6))
+		skip += 2;
+
+	/* the declared length is not long enough */
+	if (len < (9 + skip))
+		return false;
+
+	return (hdmi[9 + skip] & (1 << 7)) != 0;
+}
+
+static const struct {
+	int width, height, freq;
+	unsigned int select, value;
+	unsigned int formats;
+} s3d_mandatory_modes[] = {
+	{ 1920, 1080, 24, DRM_MODE_FLAG_INTERLACE, 0,
+	  DRM_MODE_FLAG_3D_TOP_BOTTOM | DRM_MODE_FLAG_3D_FRAME_PACKING },
+	{ 1920, 1080, 50, DRM_MODE_FLAG_INTERLACE, DRM_MODE_FLAG_INTERLACE,
+	  DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF },
+	{ 1920, 1080, 60, DRM_MODE_FLAG_INTERLACE, DRM_MODE_FLAG_INTERLACE,
+	  DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF },
+	{ 1280, 720,  50, DRM_MODE_FLAG_INTERLACE, 0,
+	  DRM_MODE_FLAG_3D_TOP_BOTTOM | DRM_MODE_FLAG_3D_FRAME_PACKING },
+	{ 1280, 720,  60, DRM_MODE_FLAG_INTERLACE, 0,
+	  DRM_MODE_FLAG_3D_TOP_BOTTOM | DRM_MODE_FLAG_3D_FRAME_PACKING }
+};
+
+static void cea_hdmi_patch_mandatory_3d_mode(struct drm_display_mode *mode)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(s3d_mandatory_modes); i++) {
+		if (mode->hdisplay == s3d_mandatory_modes[i].width &&
+		    mode->vdisplay == s3d_mandatory_modes[i].height &&
+		    (mode->flags & s3d_mandatory_modes[i].select) ==
+				s3d_mandatory_modes[i].value &&
+		    drm_mode_vrefresh(mode) == s3d_mandatory_modes[i].freq) {
+			mode->flags |= s3d_mandatory_modes[i].formats;
+		}
+	}
+}
+
+static void cea_hdmi_patch_mandatory_3d_modes(struct drm_connector *connector)
+{
+	struct drm_display_mode *mode;
+
+	list_for_each_entry(mode, &connector->probed_modes, head)
+		cea_hdmi_patch_mandatory_3d_mode(mode);
+}
+
 static int
 cea_db_payload_len(const u8 *db)
 {
@@ -1577,8 +1645,8 @@ static int
 add_cea_modes(struct drm_connector *connector, struct edid *edid)
 {
 	u8 * cea = drm_find_cea_extension(edid);
-	u8 * db, dbl;
-	int modes = 0;
+	u8 * db, *hdmi = NULL, dbl;
+	int modes = 0, vendor_id;
 
 	if (cea && cea_revision(cea) >= 3) {
 		int i, start, end;
@@ -1590,10 +1658,20 @@ add_cea_modes(struct drm_connector *connector, struct edid *edid)
 			db = &cea[i];
 			dbl = cea_db_payload_len(db);
 
-			if (cea_db_tag(db) == VIDEO_BLOCK)
+			switch ((db[0] & 0xe0) >> 5) {
+			case VIDEO_BLOCK:
 				modes += do_cea_modes (connector, db+1, dbl);
+				break;
+			case VENDOR_BLOCK:
+				vendor_id = db[1] | db[2] << 8 | db[3] << 16;
+				if (vendor_id == HDMI_IDENTIFIER)
+					hdmi = db;
+			}
 		}
 	}
+
+	if (connector->expose_3d_modes && hdmi && cea_hdmi_3d_present(hdmi))
+		cea_hdmi_patch_mandatory_3d_modes(connector);
 
 	return modes;
 }
