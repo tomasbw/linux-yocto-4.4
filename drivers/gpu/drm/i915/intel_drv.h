@@ -286,6 +286,13 @@ struct cxsr_latency {
 #define DIP_SPD_BD	0xa
 #define DIP_SPD_SCD	0xb
 
+#define DIP_TYPE_VENDOR		0x81
+#define DIP_VERSION_VENDOR	0x1
+#define DIP_HDMI_3D_PRESENT	(0x2<<5)
+#define DIP_HDMI_3D_STRUCT_FP	(0x0<<4)
+#define DIP_HDMI_3D_STRUCT_TB	(0x6<<4)
+#define DIP_HDMI_3D_STRUCT_SBSH	(0x8<<4)
+
 struct dip_infoframe {
 	uint8_t type;		/* HB0 */
 	uint8_t ver;		/* HB1 */
@@ -315,6 +322,12 @@ struct dip_infoframe {
 			uint8_t pd[16];
 			uint8_t sdi;
 		} __attribute__ ((packed)) spd;
+		struct {
+			uint8_t vendor_id[3];
+			uint8_t video_format;
+			uint8_t s3d_struct;
+			uint8_t s3d_ext_data;
+		} __attribute__ ((packed)) hdmi;
 		uint8_t payload[27];
 	} __attribute__ ((packed)) body;
 } __attribute__((packed));
@@ -407,6 +420,7 @@ int intel_ddc_get_modes(struct drm_connector *c, struct i2c_adapter *adapter);
 
 extern void intel_attach_force_audio_property(struct drm_connector *connector);
 extern void intel_attach_broadcast_rgb_property(struct drm_connector *connector);
+extern void intel_attach_expose_3d_modes_property(struct drm_connector *connector);
 
 extern void intel_crt_init(struct drm_device *dev);
 extern void intel_hdmi_init(struct drm_device *dev,

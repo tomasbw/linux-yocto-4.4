@@ -122,3 +122,15 @@ intel_attach_broadcast_rgb_property(struct drm_connector *connector)
 
 	drm_connector_attach_property(connector, prop, 0);
 }
+
+void
+intel_attach_expose_3d_modes_property(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	drm_mode_create_s3d_properties(dev);
+	prop = dev->mode_config.s3d_expose_modes_property;
+	drm_connector_attach_property(connector, prop,
+				      DRM_MODE_EXPOSE_3D_MODES_OFF);
+}

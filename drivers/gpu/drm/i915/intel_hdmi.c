@@ -89,6 +89,8 @@ static u32 g4x_infoframe_index(struct dip_infoframe *frame)
 		return VIDEO_DIP_SELECT_AVI;
 	case DIP_TYPE_SPD:
 		return VIDEO_DIP_SELECT_SPD;
+	case DIP_TYPE_VENDOR:
+		return VIDEO_DIP_SELECT_VENDOR;
 	default:
 		DRM_DEBUG_DRIVER("unknown info frame type %d\n", frame->type);
 		return 0;
@@ -102,6 +104,8 @@ static u32 g4x_infoframe_enable(struct dip_infoframe *frame)
 		return VIDEO_DIP_ENABLE_AVI;
 	case DIP_TYPE_SPD:
 		return VIDEO_DIP_ENABLE_SPD;
+	case DIP_TYPE_VENDOR:
+		return VIDEO_DIP_ENABLE_VENDOR;
 	default:
 		DRM_DEBUG_DRIVER("unknown info frame type %d\n", frame->type);
 		return 0;
@@ -344,6 +348,42 @@ static void intel_hdmi_set_spd_infoframe(struct drm_encoder *encoder)
 	intel_set_infoframe(encoder, &spd_if);
 }
 
+static void intel_hdmi_set_hdmi_infoframe(struct drm_encoder *encoder,
+					  struct drm_display_mode *adjusted_mode)
+{
+	struct dip_infoframe hdmi_if;
+
+	/* We really only need to send a HDMI vendor info frame when having
+	 * a 3D format to describe */
+	if (!(adjusted_mode->flags & DRM_MODE_FLAG_3D_MASK))
+		return;
+
+	memset(&hdmi_if, 0, sizeof(hdmi_if));
+	hdmi_if.type = DIP_TYPE_VENDOR;
+	hdmi_if.ver = DIP_VERSION_VENDOR;
+	/* HDMI IEEE registration id, least significant bit first */
+	hdmi_if.body.hdmi.vendor_id[0] = 0x03;
+	hdmi_if.body.hdmi.vendor_id[1] = 0x0c;
+	hdmi_if.body.hdmi.vendor_id[2] = 0x00;
+	hdmi_if.body.hdmi.video_format = DIP_HDMI_3D_PRESENT;
+	if (adjusted_mode->flags & DRM_MODE_FLAG_3D_FRAME_PACKING)
+		hdmi_if.body.hdmi.s3d_struct = DIP_HDMI_3D_STRUCT_FP;
+	else if (adjusted_mode->flags & DRM_MODE_FLAG_3D_TOP_BOTTOM)
+		hdmi_if.body.hdmi.s3d_struct = DIP_HDMI_3D_STRUCT_TB;
+	else if (adjusted_mode->flags & DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF)
+		hdmi_if.body.hdmi.s3d_struct = DIP_HDMI_3D_STRUCT_SBSH;
+	/* len is the payload len, not including checksum. Side by side (half)
+	 * has an extra byte for 3D_Ext_Data */
+	if (adjusted_mode->flags & DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF) {
+		hdmi_if.len = 6;
+		/* SBSH is subsampled by a factor of 2 */
+		hdmi_if.body.hdmi.s3d_ext_data = 2 << 4;
+	} else
+		hdmi_if.len = 5;
+
+	intel_set_infoframe(encoder, &hdmi_if);
+}
+
 static void g4x_set_infoframes(struct drm_encoder *encoder,
 			       struct drm_display_mode *adjusted_mode)
 {
@@ -405,6 +445,7 @@ static void g4x_set_infoframes(struct drm_encoder *encoder,
 
 	intel_hdmi_set_avi_infoframe(encoder, adjusted_mode);
 	intel_hdmi_set_spd_infoframe(encoder);
+	intel_hdmi_set_hdmi_infoframe(encoder, adjusted_mode);
 }
 
 static void ibx_set_infoframes(struct drm_encoder *encoder,
@@ -465,6 +506,7 @@ static void ibx_set_infoframes(struct drm_encoder *encoder,
 
 	intel_hdmi_set_avi_infoframe(encoder, adjusted_mode);
 	intel_hdmi_set_spd_infoframe(encoder);
+	intel_hdmi_set_hdmi_infoframe(encoder, adjusted_mode);
 }
 
 static void cpt_set_infoframes(struct drm_encoder *encoder,
@@ -500,6 +542,7 @@ static void cpt_set_infoframes(struct drm_encoder *encoder,
 
 	intel_hdmi_set_avi_infoframe(encoder, adjusted_mode);
 	intel_hdmi_set_spd_infoframe(encoder);
+	intel_hdmi_set_hdmi_infoframe(encoder, adjusted_mode);
 }
 
 static void vlv_set_infoframes(struct drm_encoder *encoder,
@@ -534,6 +577,7 @@ static void vlv_set_infoframes(struct drm_encoder *encoder,
 
 	intel_hdmi_set_avi_infoframe(encoder, adjusted_mode);
 	intel_hdmi_set_spd_infoframe(encoder);
+	intel_hdmi_set_hdmi_infoframe(encoder, adjusted_mode);
 }
 
 static void hsw_set_infoframes(struct drm_encoder *encoder,
@@ -857,7 +901,8 @@ intel_hdmi_set_property(struct drm_connector *connector,
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
 	struct intel_digital_port *intel_dig_port =
 		hdmi_to_dig_port(intel_hdmi);
-	struct drm_i915_private *dev_priv = connector->dev->dev_private;
+	struct drm_device *dev = connector->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 
 	ret = drm_connector_property_set_value(connector, property, val);
@@ -892,6 +937,7 @@ intel_hdmi_set_property(struct drm_connector *connector,
 		intel_hdmi->color_range = val ? SDVO_COLOR_RANGE_16_235 : 0;
 		goto done;
 	}
+
 
 	return -EINVAL;
 
@@ -941,6 +987,7 @@ intel_hdmi_add_properties(struct drm_connector *connector)
 {
 	intel_attach_force_audio_property(connector);
 	intel_attach_broadcast_rgb_property(connector);
+	intel_attach_expose_3d_modes_property(connector);
 }
 
 void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
