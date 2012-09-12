@@ -334,14 +334,19 @@ gmbus_xfer(struct i2c_adapter *adapter,
 	int i, reg_offset;
 	int ret = 0;
 
+	reg_offset = dev_priv->gpio_mmio_base;
+
 	mutex_lock(&dev_priv->gmbus_mutex);
+
+	/* wait at most 1 second for userspace to release gmbus */
+	if (wait_for((I915_READ(GMBUS2 + reg_offset) & GMBUS_INUSE) == 0, 1000))
+		DRM_ERROR("userspace is hogging gmbus\n");
 
 	if (bus->force_bit) {
 		ret = i2c_bit_algo.master_xfer(adapter, msgs, num);
 		goto out;
 	}
 
-	reg_offset = dev_priv->gpio_mmio_base;
 
 	I915_WRITE(GMBUS0 + reg_offset, bus->reg0);
 
@@ -437,6 +442,7 @@ timeout:
 	ret = i2c_bit_algo.master_xfer(adapter, msgs, num);
 
 out:
+	I915_WRITE(GMBUS2 + reg_offset, GMBUS_INUSE);
 	mutex_unlock(&dev_priv->gmbus_mutex);
 	return ret;
 }
@@ -470,6 +476,9 @@ int intel_setup_gmbus(struct drm_device *dev)
 		dev_priv->gpio_mmio_base = 0;
 
 	mutex_init(&dev_priv->gmbus_mutex);
+	/* clear any leftover hw locks */
+	I915_WRITE(GMBUS2 + dev_priv->gpio_mmio_base,
+		   GMBUS_INUSE | I915_READ(GMBUS2 + dev_priv->gpio_mmio_base));
 
 	for (i = 0; i < GMBUS_NUM_PORTS; i++) {
 		struct intel_gmbus *bus = &dev_priv->gmbus[i];
