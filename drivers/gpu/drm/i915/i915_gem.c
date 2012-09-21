@@ -3956,8 +3956,10 @@ i915_gem_init_hw(struct drm_device *dev)
 	if (!intel_enable_gtt())
 		return -EIO;
 
-	if (IS_HASWELL(dev) && (I915_READ(0x120010) == 1))
+	if (IS_HASWELL(dev) && (I915_READ(0x120010) == 1)) {
 		I915_WRITE(0x9008, I915_READ(0x9008) | 0xf0000);
+		dev_priv->mutable_info.has_ellc = 1;
+	}
 
 	i915_gem_l3_remap(dev);
 

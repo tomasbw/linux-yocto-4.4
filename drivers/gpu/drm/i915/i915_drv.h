@@ -409,6 +409,10 @@ typedef struct drm_i915_private {
 
 	const struct intel_device_info *info;
 
+	struct {
+		u8 has_ellc:1;
+	} mutable_info;
+
 	int relative_constants_mode;
 
 	void __iomem *regs;
@@ -1156,6 +1160,7 @@ struct drm_i915_file_private {
 #define HAS_BSD(dev)            (INTEL_INFO(dev)->has_bsd_ring)
 #define HAS_BLT(dev)            (INTEL_INFO(dev)->has_blt_ring)
 #define HAS_LLC(dev)            (INTEL_INFO(dev)->has_llc)
+#define HAS_ELLC(dev)		(((struct drm_i915_private *)(dev)->dev_private)->mutable_info.has_ellc)
 #define I915_NEED_GFX_HWS(dev)	(INTEL_INFO(dev)->need_gfx_hws)
 
 #define HAS_HW_CONTEXTS(dev)	(INTEL_INFO(dev)->gen >= 6)
