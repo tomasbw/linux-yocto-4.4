@@ -1157,24 +1157,15 @@ static bool gen6_check_flags(unsigned int flags)
 static void haswell_write_entry(dma_addr_t addr, unsigned int entry,
 				unsigned int flags)
 {
-	unsigned int type_mask = flags & ~AGP_USER_CACHED_MEMORY_GFDT;
-	unsigned int gfdt = flags & AGP_USER_CACHED_MEMORY_GFDT;
 	u32 pte_flags;
 
-	if (type_mask == AGP_USER_MEMORY)
+	if (flags == AGP_USER_MEMORY)
 		pte_flags = HSW_PTE_UNCACHED | I810_PTE_VALID;
-	else if (type_mask == AGP_USER_CACHED_MEMORY_LLC_MLC) {
-		pte_flags = GEN6_PTE_LLC_MLC | I810_PTE_VALID;
-		if (gfdt)
-			pte_flags |= GEN6_PTE_GFDT;
-	} else { /* set 'normal'/'cached' to LLC by default */
+	else
 		pte_flags = GEN6_PTE_LLC | I810_PTE_VALID;
-		if (gfdt)
-			pte_flags |= GEN6_PTE_GFDT;
-	}
 
-	/* gen6 has bit11-4 for physical addr bit39-32 */
-	addr |= (addr >> 28) & 0xff0;
+	/* hsw has bit10-4 for physical addr bit38-32 */
+	addr |= (addr >> 28) & 0x7f0;
 	writel(addr | pte_flags, intel_private.gtt + entry);
 }
 
