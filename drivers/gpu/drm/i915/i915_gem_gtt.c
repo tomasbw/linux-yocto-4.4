@@ -29,6 +29,17 @@
 #include "i915_trace.h"
 #include "intel_drv.h"
 
+static inline uint32_t pte_encode(struct drm_device *dev,
+				  dma_addr_t addr,
+			          uint32_t cache_bits)
+{
+	uint32_t pte = GEN6_PTE_VALID;
+	pte |= GEN6_PTE_ADDR_ENCODE(addr);
+	pte |= cache_bits;
+
+	return pte;
+}
+
 /* PPGTT support for Sandybdrige/Gen6 and later */
 static void i915_ppgtt_clear_range(struct i915_hw_ppgtt *ppgtt,
 				   unsigned first_entry,
@@ -40,8 +51,8 @@ static void i915_ppgtt_clear_range(struct i915_hw_ppgtt *ppgtt,
 	unsigned first_pte = first_entry % I915_PPGTT_PT_ENTRIES;
 	unsigned last_pte, i;
 
-	scratch_pte = GEN6_PTE_ADDR_ENCODE(ppgtt->scratch_page_dma_addr);
-	scratch_pte |= GEN6_PTE_VALID | GEN6_PTE_CACHE_LLC;
+	scratch_pte = pte_encode(ppgtt->dev, ppgtt->scratch_page_dma_addr,
+				 GEN6_PTE_CACHE_LLC);
 
 	while (num_entries) {
 		last_pte = first_pte + num_entries;
@@ -172,7 +183,7 @@ static void i915_ppgtt_insert_sg_entries(struct i915_hw_ppgtt *ppgtt,
 					 unsigned first_entry,
 					 uint32_t pte_flags)
 {
-	uint32_t *pt_vaddr, pte;
+	uint32_t *pt_vaddr;
 	unsigned act_pd = first_entry / I915_PPGTT_PT_ENTRIES;
 	unsigned first_pte = first_entry % I915_PPGTT_PT_ENTRIES;
 	unsigned i, j, m, segment_len;
@@ -190,8 +201,8 @@ static void i915_ppgtt_insert_sg_entries(struct i915_hw_ppgtt *ppgtt,
 
 		for (j = first_pte; j < I915_PPGTT_PT_ENTRIES; j++) {
 			page_addr = sg_dma_address(sg) + (m << PAGE_SHIFT);
-			pte = GEN6_PTE_ADDR_ENCODE(page_addr);
-			pt_vaddr[j] = pte | pte_flags;
+			pt_vaddr[j] = pte_encode(ppgtt->dev, page_addr,
+						 pte_flags);
 
 			/* grab the next page */
 			if (++m == segment_len) {
