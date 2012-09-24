@@ -31,11 +31,36 @@
 
 static inline uint32_t pte_encode(struct drm_device *dev,
 				  dma_addr_t addr,
-			          uint32_t cache_bits)
+			          enum i915_cache_level level)
 {
 	uint32_t pte = GEN6_PTE_VALID;
-	pte |= GEN6_PTE_ADDR_ENCODE(addr);
-	pte |= cache_bits;
+
+	if (IS_HASWELL(dev)) {
+		pte |= HSW_PTE_ADDR_ENCODE(addr);
+		switch (level) {
+		case I915_CACHE_LLC:
+			pte |= GEN6_PTE_CACHE_LLC;
+			break;
+		case I915_CACHE_LLC_MLC:
+		case I915_CACHE_NONE:
+			pte |= HSW_PTE_UNCACHED;
+			break;
+		}
+	} else {
+		pte |= GEN6_PTE_ADDR_ENCODE(addr);
+		switch (level) {
+		case I915_CACHE_LLC_MLC:
+			pte |= GEN6_PTE_CACHE_LLC_MLC;
+			break;
+		case I915_CACHE_LLC:
+			pte |= GEN6_PTE_CACHE_LLC;
+			break;
+		default:
+		case I915_CACHE_NONE:
+			pte |= GEN6_PTE_UNCACHED;
+			break;
+		}
+	}
 
 	return pte;
 }
@@ -104,7 +129,7 @@ int i915_gem_init_aliasing_ppgtt(struct drm_device *dev)
 
 	if (dev_priv->mm.gtt->needs_dmar) {
 		ppgtt->pt_dma_addr = kzalloc(sizeof(dma_addr_t)
-						*ppgtt->num_pd_entries,
+					     *ppgtt->num_pd_entries,
 					     GFP_KERNEL);
 		if (!ppgtt->pt_dma_addr)
 			goto err_pt_alloc;
@@ -181,7 +206,7 @@ void i915_gem_cleanup_aliasing_ppgtt(struct drm_device *dev)
 static void i915_ppgtt_insert_sg_entries(struct i915_hw_ppgtt *ppgtt,
 					 const struct sg_table *pages,
 					 unsigned first_entry,
-					 uint32_t pte_flags)
+					 enum i915_cache_level cache_level)
 {
 	uint32_t *pt_vaddr;
 	unsigned act_pd = first_entry / I915_PPGTT_PT_ENTRIES;
@@ -202,7 +227,7 @@ static void i915_ppgtt_insert_sg_entries(struct i915_hw_ppgtt *ppgtt,
 		for (j = first_pte; j < I915_PPGTT_PT_ENTRIES; j++) {
 			page_addr = sg_dma_address(sg) + (m << PAGE_SHIFT);
 			pt_vaddr[j] = pte_encode(ppgtt->dev, page_addr,
-						 pte_flags);
+						 cache_level);
 
 			/* grab the next page */
 			if (++m == segment_len) {
@@ -226,33 +251,10 @@ void i915_ppgtt_bind_object(struct i915_hw_ppgtt *ppgtt,
 			    struct drm_i915_gem_object *obj,
 			    enum i915_cache_level cache_level)
 {
-	uint32_t pte_flags = GEN6_PTE_VALID;
-
-	switch (cache_level) {
-	case I915_CACHE_LLC_MLC:
-		/* Haswell doesn't set L3 this way */
-		if (IS_HASWELL(ppgtt->dev))
-			pte_flags |= GEN6_PTE_CACHE_LLC;
-		else
-			pte_flags |= GEN6_PTE_CACHE_LLC_MLC;
-		break;
-	case I915_CACHE_LLC:
-		pte_flags |= GEN6_PTE_CACHE_LLC;
-		break;
-	case I915_CACHE_NONE:
-		if (IS_HASWELL(ppgtt->dev))
-			pte_flags |= HSW_PTE_UNCACHED;
-		else
-			pte_flags |= GEN6_PTE_UNCACHED;
-		break;
-	default:
-		BUG();
-	}
-
 	i915_ppgtt_insert_sg_entries(ppgtt,
 				     obj->pages,
 				     obj->gtt_space->start >> PAGE_SHIFT,
-				     pte_flags);
+				     cache_level);
 }
 
 void i915_ppgtt_unbind_object(struct i915_hw_ppgtt *ppgtt,

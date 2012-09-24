@@ -108,6 +108,7 @@
 
 /* PPGTT stuff */
 #define GEN6_GTT_ADDR_ENCODE(addr)	((addr) | (((addr) >> 28) & 0xff0))
+#define HSW_GTT_ADDR_ENCODE(addr)	((addr) | (((addr) >> 28) & 0x7f0))
 
 #define GEN6_PDE_VALID			(1 << 0)
 #define GEN6_PDE_LARGE_PAGE		(2 << 0) /* use 32kb pages */
@@ -122,6 +123,7 @@
 #define GEN6_PTE_CACHE_BITS		(3 << 1)
 #define GEN6_PTE_GFDT			(1 << 3)
 #define GEN6_PTE_ADDR_ENCODE(addr)	GEN6_GTT_ADDR_ENCODE(addr)
+#define HSW_PTE_ADDR_ENCODE(addr)	HSW_GTT_ADDR_ENCODE(addr)
 
 #define RING_PP_DIR_BASE(ring)		((ring)->mmio_base+0x228)
 #define RING_PP_DIR_BASE_READ(ring)	((ring)->mmio_base+0x518)
