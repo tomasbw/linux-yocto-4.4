@@ -441,6 +441,11 @@ init_pipe_control(struct intel_ring_buffer *ring)
 {
 	struct pipe_control *pc;
 	struct drm_i915_gem_object *obj;
+	struct drm_i915_cache_attributes cache = {
+		.level = I915_CACHE_LLC,
+		.policy = I915_CACHE_WB,
+		.age = 3
+	};
 	int ret;
 
 	if (ring->private)
@@ -457,7 +462,7 @@ init_pipe_control(struct intel_ring_buffer *ring)
 		goto err;
 	}
 
-	i915_gem_object_set_cache_level(obj, I915_CACHE_LLC);
+	i915_gem_object_set_cache_level(obj, cache);
 
 	ret = i915_gem_object_pin(obj, 4096, true, false);
 	if (ret)
@@ -1037,6 +1042,11 @@ static int init_status_page(struct intel_ring_buffer *ring)
 {
 	struct drm_device *dev = ring->dev;
 	struct drm_i915_gem_object *obj;
+	struct drm_i915_cache_attributes cache = {
+		.level = I915_CACHE_LLC,
+		.policy = I915_CACHE_WB,
+		.age = 3
+	};
 	int ret;
 
 	obj = i915_gem_alloc_object(dev, 4096);
@@ -1046,7 +1056,7 @@ static int init_status_page(struct intel_ring_buffer *ring)
 		goto err;
 	}
 
-	i915_gem_object_set_cache_level(obj, I915_CACHE_LLC);
+	i915_gem_object_set_cache_level(obj, cache);
 
 	ret = i915_gem_object_pin(obj, 4096, true, false);
 	if (ret != 0) {

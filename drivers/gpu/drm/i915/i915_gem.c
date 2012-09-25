@@ -1362,7 +1362,7 @@ int i915_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	}
 
 	if (!obj->has_global_gtt_mapping)
-		i915_gem_gtt_bind_object(obj, obj->cache.level);
+		i915_gem_gtt_bind_object(obj, obj->cache);
 
 	ret = i915_gem_object_get_fence(obj);
 	if (ret)
@@ -2968,7 +2968,7 @@ i915_gem_object_bind_to_gtt(struct drm_i915_gem_object *obj,
 	}
 
 	if (!dev_priv->mm.aliasing_ppgtt)
-		i915_gem_gtt_bind_object(obj, obj->cache.level);
+		i915_gem_gtt_bind_object(obj, obj->cache);
 
 	list_move_tail(&obj->gtt_list, &dev_priv->mm.bound_list);
 	list_add_tail(&obj->mm_list, &dev_priv->mm.inactive_list);
@@ -3113,13 +3113,15 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 }
 
 int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
-				    enum i915_cache_level cache_level)
+				    struct drm_i915_cache_attributes cache)
 {
 	struct drm_device *dev = obj->base.dev;
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret;
 
-	if (obj->cache.level == cache_level)
+	if (obj->cache.level == cache.level &&
+	    obj->cache.policy == cache.policy &&
+	    obj->cache.age == cache.age)
 		return 0;
 
 	if (obj->pin_count) {
@@ -3127,7 +3129,7 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 		return -EBUSY;
 	}
 
-	if (!i915_gem_valid_gtt_space(dev, obj->gtt_space, cache_level)) {
+	if (!i915_gem_valid_gtt_space(dev, obj->gtt_space, cache.level)) {
 		ret = i915_gem_object_unbind(obj);
 		if (ret)
 			return ret;
@@ -3151,15 +3153,15 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 		}
 
 		if (obj->has_global_gtt_mapping)
-			i915_gem_gtt_bind_object(obj, cache_level);
+			i915_gem_gtt_bind_object(obj, cache);
 		if (obj->has_aliasing_ppgtt_mapping)
 			i915_ppgtt_bind_object(dev_priv->mm.aliasing_ppgtt,
-					       obj, cache_level);
+					       obj, cache);
 
-		obj->gtt_space->color = cache_level;
+		obj->gtt_space->color = cache.level;
 	}
 
-	if (cache_level == I915_CACHE_NONE) {
+	if (cache.level == I915_CACHE_NONE) {
 		u32 old_read_domains, old_write_domain;
 
 		/* If we're coming from LLC cached, then we haven't
@@ -3182,7 +3184,9 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 						    old_write_domain);
 	}
 
-	obj->cache.level = cache_level;
+	obj->cache.level = cache.level;
+	obj->cache.policy = cache.policy;
+	obj->cache.age = cache.age;
 	i915_gem_verify_gtt(dev);
 	return 0;
 }
@@ -3217,15 +3221,18 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 {
 	struct drm_i915_gem_caching *args = data;
 	struct drm_i915_gem_object *obj;
-	enum i915_cache_level level;
+	struct drm_i915_cache_attributes cache = {
+		.policy = I915_CACHE_WB,
+		.age = 3
+	};
 	int ret;
 
 	switch (args->caching) {
 	case I915_CACHING_NONE:
-		level = I915_CACHE_NONE;
+		cache.level = I915_CACHE_NONE;
 		break;
 	case I915_CACHING_CACHED:
-		level = I915_CACHE_LLC;
+		cache.level = I915_CACHE_LLC;
 		break;
 	default:
 		return -EINVAL;
@@ -3241,7 +3248,7 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 		goto unlock;
 	}
 
-	ret = i915_gem_object_set_cache_level(obj, level);
+	ret = i915_gem_object_set_cache_level(obj, cache);
 
 	drm_gem_object_unreference(&obj->base);
 unlock:
@@ -3260,6 +3267,11 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 				     struct intel_ring_buffer *pipelined)
 {
 	u32 old_read_domains, old_write_domain;
+	struct drm_i915_cache_attributes cache = {
+		.level = I915_CACHE_NONE,
+		.policy = I915_CACHE_WB,
+		.age = 3
+	};
 	int ret;
 
 	if (pipelined != obj->ring) {
@@ -3277,7 +3289,7 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 	 * of uncaching, which would allow us to flush all the LLC-cached data
 	 * with that bit in the PTE to main memory with just one PIPE_CONTROL.
 	 */
-	ret = i915_gem_object_set_cache_level(obj, I915_CACHE_NONE);
+	ret = i915_gem_object_set_cache_level(obj, cache);
 	if (ret)
 		return ret;
 
@@ -3455,7 +3467,7 @@ i915_gem_object_pin(struct drm_i915_gem_object *obj,
 	}
 
 	if (!obj->has_global_gtt_mapping && map_and_fenceable)
-		i915_gem_gtt_bind_object(obj, obj->cache.level);
+		i915_gem_gtt_bind_object(obj, obj->cache);
 
 	obj->pin_count++;
 	obj->pin_mappable |= map_and_fenceable;

@@ -30,11 +30,10 @@
 #include "intel_drv.h"
 
 /* WB and WT cache bits are formulaic once you eliminate everything else */
-static inline uint32_t __attribute__((unused))
-lookup_haswell_cache_bits(struct drm_i915_private *dev_priv,
-			  enum i915_cache_level level,
-			  enum i915_cache_policy pol,
-			  u8 age)
+static inline uint32_t lookup_haswell_cache_bits(struct drm_i915_private *dev_priv,
+						 enum i915_cache_level level,
+						 enum i915_cache_policy pol,
+						 u8 age)
 {
 	uint32_t bits = 0, age_bits;
 
@@ -77,7 +76,9 @@ lookup_haswell_cache_bits(struct drm_i915_private *dev_priv,
 
 static inline uint32_t pte_encode(struct drm_device *dev,
 				  dma_addr_t addr,
-			          enum i915_cache_level level)
+			          enum i915_cache_level level,
+				  enum i915_cache_policy pol,
+				  u8 age)
 {
 	uint32_t pte = GEN6_PTE_VALID;
 
@@ -127,7 +128,7 @@ static void i915_ppgtt_clear_range(struct i915_hw_ppgtt *ppgtt,
 	unsigned last_pte, i;
 
 	scratch_pte = pte_encode(ppgtt->dev, ppgtt->scratch_page_dma_addr,
-				 GEN6_PTE_CACHE_LLC);
+				 I915_CACHE_LLC, I915_CACHE_WB, 0);
 
 	while (num_entries) {
 		last_pte = first_pte + num_entries;
@@ -256,7 +257,8 @@ void i915_gem_cleanup_aliasing_ppgtt(struct drm_device *dev)
 static void i915_ppgtt_insert_sg_entries(struct i915_hw_ppgtt *ppgtt,
 					 const struct sg_table *pages,
 					 unsigned first_entry,
-					 enum i915_cache_level cache_level)
+					 enum i915_cache_level cache_level,
+					 enum i915_cache_policy pol, u8 age)
 {
 	uint32_t *pt_vaddr;
 	unsigned act_pd = first_entry / I915_PPGTT_PT_ENTRIES;
@@ -277,7 +279,7 @@ static void i915_ppgtt_insert_sg_entries(struct i915_hw_ppgtt *ppgtt,
 		for (j = first_pte; j < I915_PPGTT_PT_ENTRIES; j++) {
 			page_addr = sg_dma_address(sg) + (m << PAGE_SHIFT);
 			pt_vaddr[j] = pte_encode(ppgtt->dev, page_addr,
-						 cache_level);
+						 cache_level, pol, age);
 
 			/* grab the next page */
 			if (++m == segment_len) {
@@ -299,12 +301,12 @@ static void i915_ppgtt_insert_sg_entries(struct i915_hw_ppgtt *ppgtt,
 
 void i915_ppgtt_bind_object(struct i915_hw_ppgtt *ppgtt,
 			    struct drm_i915_gem_object *obj,
-			    enum i915_cache_level cache_level)
+			    struct drm_i915_cache_attributes cache)
 {
 	i915_ppgtt_insert_sg_entries(ppgtt,
 				     obj->pages,
 				     obj->gtt_space->start >> PAGE_SHIFT,
-				     cache_level);
+				     cache.level, I915_CACHE_WB, 3);
 }
 
 void i915_ppgtt_unbind_object(struct i915_hw_ppgtt *ppgtt,
@@ -368,7 +370,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 
 	list_for_each_entry(obj, &dev_priv->mm.bound_list, gtt_list) {
 		i915_gem_clflush_object(obj);
-		i915_gem_gtt_bind_object(obj, obj->cache.level);
+		i915_gem_gtt_bind_object(obj, obj->cache);
 	}
 
 	intel_gtt_chipset_flush();
@@ -388,10 +390,10 @@ int i915_gem_gtt_prepare_object(struct drm_i915_gem_object *obj)
 }
 
 void i915_gem_gtt_bind_object(struct drm_i915_gem_object *obj,
-			      enum i915_cache_level cache_level)
+			      struct drm_i915_cache_attributes cache)
 {
 	struct drm_device *dev = obj->base.dev;
-	unsigned int agp_type = cache_level_to_agp_type(dev, cache_level);
+	unsigned int agp_type = cache_level_to_agp_type(dev, cache.level);
 
 	intel_gtt_insert_sg_entries(obj->pages,
 				    obj->gtt_space->start >> PAGE_SHIFT,

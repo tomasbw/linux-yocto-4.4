@@ -126,7 +126,7 @@ i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,
 	    reloc->write_domain == I915_GEM_DOMAIN_INSTRUCTION &&
 	    !target_i915_obj->has_global_gtt_mapping)) {
 		i915_gem_gtt_bind_object(target_i915_obj,
-					 target_i915_obj->cache.level);
+					 target_i915_obj->cache);
 	}
 
 	/* The target buffer should have appeared before us in the
@@ -381,7 +381,7 @@ i915_gem_execbuffer_reserve_object(struct drm_i915_gem_object *obj,
 	/* Ensure ppgtt mapping exists if needed */
 	if (dev_priv->mm.aliasing_ppgtt && !obj->has_aliasing_ppgtt_mapping) {
 		i915_ppgtt_bind_object(dev_priv->mm.aliasing_ppgtt,
-				       obj, obj->cache.level);
+				       obj, obj->cache);
 
 		obj->has_aliasing_ppgtt_mapping = 1;
 	}
