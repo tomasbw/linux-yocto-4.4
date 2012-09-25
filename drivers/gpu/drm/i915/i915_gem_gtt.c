@@ -368,7 +368,7 @@ void i915_gem_restore_gtt_mappings(struct drm_device *dev)
 
 	list_for_each_entry(obj, &dev_priv->mm.bound_list, gtt_list) {
 		i915_gem_clflush_object(obj);
-		i915_gem_gtt_bind_object(obj, obj->cache_level);
+		i915_gem_gtt_bind_object(obj, obj->cache.level);
 	}
 
 	intel_gtt_chipset_flush();

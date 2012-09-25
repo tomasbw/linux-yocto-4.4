@@ -247,7 +247,9 @@ struct drm_i915_error_state {
 		u32 dirty:1;
 		u32 purgeable:1;
 		s32 ring:4;
-		u32 cache_level:2;
+		u32 cache_level;
+		u32 cache_policy;
+		u32 cache_age;
 	} *active_bo, *pinned_bo;
 	u32 active_bo_count, pinned_bo_count;
 	struct intel_overlay_error_state *overlay;
@@ -928,6 +930,12 @@ enum i915_cache_policy {
 	I915_CACHE_WT,
 };
 
+struct drm_i915_cache_attributes {
+	enum i915_cache_level level;
+	enum i915_cache_policy policy;
+	u8 age;
+};
+
 struct drm_i915_gem_object_ops {
 	/* Interface between the GEM object and its backing storage.
 	 * get_pages() is called once prior to the use of the associated set
@@ -1031,7 +1039,7 @@ struct drm_i915_gem_object {
 	unsigned int pending_fenced_gpu_access:1;
 	unsigned int fenced_gpu_access:1;
 
-	unsigned int cache_level:2;
+	struct drm_i915_cache_attributes cache;
 
 	unsigned int has_aliasing_ppgtt_mapping:1;
 	unsigned int has_global_gtt_mapping:1;

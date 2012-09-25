@@ -1014,7 +1014,9 @@ static void capture_bo(struct drm_i915_error_buffer *err,
 	err->dirty = obj->dirty;
 	err->purgeable = obj->madv != I915_MADV_WILLNEED;
 	err->ring = obj->ring ? obj->ring->id : -1;
-	err->cache_level = obj->cache_level;
+	err->cache_level = obj->cache.level;
+	err->cache_policy = obj->cache.policy;
+	err->cache_age = obj->cache.age;
 }
 
 static u32 capture_active_bo(struct drm_i915_error_buffer *err,

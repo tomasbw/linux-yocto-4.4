@@ -113,7 +113,7 @@ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 		   obj->last_read_seqno,
 		   obj->last_write_seqno,
 		   obj->last_fenced_seqno,
-		   cache_level_str(obj->cache_level),
+		   cache_level_str(obj->cache.level),
 		   obj->dirty ? " dirty" : "",
 		   obj->madv == I915_MADV_DONTNEED ? " purgeable" : "");
 	if (obj->base.name)

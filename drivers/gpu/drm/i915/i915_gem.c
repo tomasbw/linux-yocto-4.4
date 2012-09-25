@@ -424,7 +424,7 @@ i915_gem_shmem_pread(struct drm_device *dev,
 		 * read domain and manually flush cachelines (if required). This
 		 * optimizes for the case when the gpu will dirty the data
 		 * anyway again before the next pread happens. */
-		if (obj->cache_level == I915_CACHE_NONE)
+		if (obj->cache.level == I915_CACHE_NONE)
 			needs_clflush = 1;
 		if (obj->gtt_space) {
 			ret = i915_gem_object_set_to_gtt_domain(obj, false);
@@ -752,7 +752,7 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 		 * write domain and manually flush cachelines (if required). This
 		 * optimizes for the case when the gpu will use the data
 		 * right away and we therefore have to clflush anyway. */
-		if (obj->cache_level == I915_CACHE_NONE)
+		if (obj->cache.level == I915_CACHE_NONE)
 			needs_clflush_after = 1;
 		if (obj->gtt_space) {
 			ret = i915_gem_object_set_to_gtt_domain(obj, true);
@@ -763,7 +763,7 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 	/* Same trick applies for invalidate partially written cachelines before
 	 * writing.  */
 	if (!(obj->base.read_domains & I915_GEM_DOMAIN_CPU)
-	    && obj->cache_level == I915_CACHE_NONE)
+	    && obj->cache.level == I915_CACHE_NONE)
 		needs_clflush_before = 1;
 
 	ret = i915_gem_object_get_pages(obj);
@@ -921,7 +921,7 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		goto out;
 	}
 
-	if (obj->cache_level == I915_CACHE_NONE &&
+	if (obj->cache.level == I915_CACHE_NONE &&
 	    obj->tiling_mode == I915_TILING_NONE &&
 	    obj->base.write_domain != I915_GEM_DOMAIN_CPU) {
 		ret = i915_gem_gtt_pwrite_fast(dev, obj, args, file);
@@ -1362,7 +1362,7 @@ int i915_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	}
 
 	if (!obj->has_global_gtt_mapping)
-		i915_gem_gtt_bind_object(obj, obj->cache_level);
+		i915_gem_gtt_bind_object(obj, obj->cache.level);
 
 	ret = i915_gem_object_get_fence(obj);
 	if (ret)
@@ -2835,11 +2835,11 @@ static void i915_gem_verify_gtt(struct drm_device *dev)
 			continue;
 		}
 
-		if (obj->cache_level != obj->gtt_space->color) {
+		if (obj->cache.level != obj->gtt_space->color) {
 			printk(KERN_ERR "object reserved space [%08lx, %08lx] with wrong color, cache_level=%x, color=%lx\n",
 			       obj->gtt_space->start,
 			       obj->gtt_space->start + obj->gtt_space->size,
-			       obj->cache_level,
+			       obj->cache.level,
 			       obj->gtt_space->color);
 			err++;
 			continue;
@@ -2847,11 +2847,11 @@ static void i915_gem_verify_gtt(struct drm_device *dev)
 
 		if (!i915_gem_valid_gtt_space(dev,
 					      obj->gtt_space,
-					      obj->cache_level)) {
+					      obj->cache.level)) {
 			printk(KERN_ERR "invalid GTT space found at [%08lx, %08lx] - color=%x\n",
 			       obj->gtt_space->start,
 			       obj->gtt_space->start + obj->gtt_space->size,
-			       obj->cache_level);
+			       obj->cache.level);
 			err++;
 			continue;
 		}
@@ -2920,30 +2920,30 @@ i915_gem_object_bind_to_gtt(struct drm_i915_gem_object *obj,
 	if (map_and_fenceable)
 		free_space =
 			drm_mm_search_free_in_range_color(&dev_priv->mm.gtt_space,
-							  size, alignment, obj->cache_level,
+							  size, alignment, obj->cache.level,
 							  0, dev_priv->mm.gtt_mappable_end,
 							  false);
 	else
 		free_space = drm_mm_search_free_color(&dev_priv->mm.gtt_space,
-						      size, alignment, obj->cache_level,
+						      size, alignment, obj->cache.level,
 						      false);
 
 	if (free_space != NULL) {
 		if (map_and_fenceable)
 			obj->gtt_space =
 				drm_mm_get_block_range_generic(free_space,
-							       size, alignment, obj->cache_level,
+							       size, alignment, obj->cache.level,
 							       0, dev_priv->mm.gtt_mappable_end,
 							       false);
 		else
 			obj->gtt_space =
 				drm_mm_get_block_generic(free_space,
-							 size, alignment, obj->cache_level,
+							 size, alignment, obj->cache.level,
 							 false);
 	}
 	if (obj->gtt_space == NULL) {
 		ret = i915_gem_evict_something(dev, size, alignment,
-					       obj->cache_level,
+					       obj->cache.level,
 					       map_and_fenceable,
 					       nonblocking);
 		if (ret)
@@ -2953,7 +2953,7 @@ i915_gem_object_bind_to_gtt(struct drm_i915_gem_object *obj,
 	}
 	if (WARN_ON(!i915_gem_valid_gtt_space(dev,
 					      obj->gtt_space,
-					      obj->cache_level))) {
+					      obj->cache.level))) {
 		drm_mm_put_block(obj->gtt_space);
 		obj->gtt_space = NULL;
 		return -EINVAL;
@@ -2968,7 +2968,7 @@ i915_gem_object_bind_to_gtt(struct drm_i915_gem_object *obj,
 	}
 
 	if (!dev_priv->mm.aliasing_ppgtt)
-		i915_gem_gtt_bind_object(obj, obj->cache_level);
+		i915_gem_gtt_bind_object(obj, obj->cache.level);
 
 	list_move_tail(&obj->gtt_list, &dev_priv->mm.bound_list);
 	list_add_tail(&obj->mm_list, &dev_priv->mm.inactive_list);
@@ -3007,7 +3007,7 @@ i915_gem_clflush_object(struct drm_i915_gem_object *obj)
 	 * snooping behaviour occurs naturally as the result of our domain
 	 * tracking.
 	 */
-	if (obj->cache_level != I915_CACHE_NONE)
+	if (obj->cache.level != I915_CACHE_NONE)
 		return;
 
 	trace_i915_gem_object_clflush(obj);
@@ -3119,7 +3119,7 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	int ret;
 
-	if (obj->cache_level == cache_level)
+	if (obj->cache.level == cache_level)
 		return 0;
 
 	if (obj->pin_count) {
@@ -3182,7 +3182,7 @@ int i915_gem_object_set_cache_level(struct drm_i915_gem_object *obj,
 						    old_write_domain);
 	}
 
-	obj->cache_level = cache_level;
+	obj->cache.level = cache_level;
 	i915_gem_verify_gtt(dev);
 	return 0;
 }
@@ -3204,7 +3204,7 @@ int i915_gem_get_caching_ioctl(struct drm_device *dev, void *data,
 		goto unlock;
 	}
 
-	args->caching = obj->cache_level != I915_CACHE_NONE;
+	args->caching = obj->cache.level != I915_CACHE_NONE;
 
 	drm_gem_object_unreference(&obj->base);
 unlock:
@@ -3455,7 +3455,7 @@ i915_gem_object_pin(struct drm_i915_gem_object *obj,
 	}
 
 	if (!obj->has_global_gtt_mapping && map_and_fenceable)
-		i915_gem_gtt_bind_object(obj, obj->cache_level);
+		i915_gem_gtt_bind_object(obj, obj->cache.level);
 
 	obj->pin_count++;
 	obj->pin_mappable |= map_and_fenceable;
@@ -3719,9 +3719,9 @@ struct drm_i915_gem_object *i915_gem_alloc_object(struct drm_device *dev,
 		 * However, we maintain the display planes as UC, and so
 		 * need to rebind when first used as such.
 		 */
-		obj->cache_level = I915_CACHE_LLC;
+		obj->cache.level = I915_CACHE_LLC;
 	} else
-		obj->cache_level = I915_CACHE_NONE;
+		obj->cache.level = I915_CACHE_NONE;
 
 	return obj;
 }
