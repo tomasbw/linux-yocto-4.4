@@ -918,6 +918,14 @@ enum i915_cache_level {
 	I915_CACHE_NONE = 0,
 	I915_CACHE_LLC,
 	I915_CACHE_LLC_MLC, /* gen6+, in docs at least! */
+	I915_CACHE_LLC_ELLC, /* some HSW skus */
+	I915_CACHE_ELLC,    /* some HSW skus */
+};
+
+/* These match the userspace interface for convenience */
+enum i915_cache_policy {
+	I915_CACHE_WB = 0,
+	I915_CACHE_WT,
 };
 
 struct drm_i915_gem_object_ops {

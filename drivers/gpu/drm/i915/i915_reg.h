@@ -117,13 +117,30 @@
 
 #define GEN6_PTE_VALID			(1 << 0)
 #define GEN6_PTE_UNCACHED		(1 << 1)
-#define HSW_PTE_UNCACHED		(0)
 #define GEN6_PTE_CACHE_LLC		(2 << 1)
 #define GEN6_PTE_CACHE_LLC_MLC		(3 << 1)
 #define GEN6_PTE_CACHE_BITS		(3 << 1)
 #define GEN6_PTE_GFDT			(1 << 3)
 #define GEN6_PTE_ADDR_ENCODE(addr)	GEN6_GTT_ADDR_ENCODE(addr)
 #define HSW_PTE_ADDR_ENCODE(addr)	HSW_GTT_ADDR_ENCODE(addr)
+
+/* HSW Cacheability bits */
+#define HSW_PTE_UNCACHED		((0 << 11) | (0 << 1))
+#define HSW_PTE_WT_LLC_ELLC_3		((0 << 11) | (7 << 1))
+#define HSW_PTE_WT_LLC_ELLC_0		((0 << 11) | (6 << 1))
+#define HSW_PTE_WT_ELLC_3		((0 << 11) | (5 << 1))
+#define HSW_PTE_WT_ELLC_0		((0 << 11) | (4 << 1))
+#define HSW_PTE_WB_LLC_ELLC_3		((1 << 11) | (0 << 1))
+#define HSW_PTE_WB_LLC_ELLC_2		((1 << 11) | (1 << 1))
+#define HSW_PTE_WB_LLC_ELLC_1		((1 << 11) | (2 << 1))
+#define HSW_PTE_WB_LLC_ELLC_0		((1 << 11) | (3 << 1))
+#define HSW_PTE_WB_ELLC_3		((1 << 11) | (4 << 1))
+#define HSW_PTE_WB_ELLC_2		((1 << 11) | (5 << 1))
+#define HSW_PTE_WB_ELLC_1		((1 << 11) | (6 << 1))
+#define HSW_PTE_WB_ELLC_0		((1 << 11) | (7 << 1))
+#define HSW_PTE_WB_LLC_3		((0 << 11) | (2 << 1))
+#define HSW_PTE_WB_LLC_0		((0 << 11) | (3 << 1))
+#define HSW_PTE_CACHE_LLC		HSW_PTE_WB_LLC_3
 
 #define RING_PP_DIR_BASE(ring)		((ring)->mmio_base+0x228)
 #define RING_PP_DIR_BASE_READ(ring)	((ring)->mmio_base+0x518)

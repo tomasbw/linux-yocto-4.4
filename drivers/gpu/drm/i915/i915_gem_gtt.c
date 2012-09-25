@@ -29,6 +29,52 @@
 #include "i915_trace.h"
 #include "intel_drv.h"
 
+/* WB and WT cache bits are formulaic once you eliminate everything else */
+static inline uint32_t __attribute__((unused))
+lookup_haswell_cache_bits(struct drm_i915_private *dev_priv,
+			  enum i915_cache_level level,
+			  enum i915_cache_policy pol,
+			  u8 age)
+{
+	uint32_t bits = 0, age_bits;
+
+	if (level == I915_CACHE_NONE)
+		return HSW_PTE_UNCACHED;
+
+	if (level == I915_CACHE_LLC || !dev_priv->mutable_info.has_ellc) {
+		if (age >= 3)
+			return HSW_PTE_WB_LLC_3;
+		else
+			return HSW_PTE_WB_LLC_0;
+	}
+
+	if (pol == I915_CACHE_WT) {
+		bits = (1 << 4);
+
+		if (level == I915_CACHE_LLC_ELLC)
+			bits |= (1 << 2);
+
+		if (age != 0)
+			bits |= (1 << 1);
+
+		return bits;
+	}
+
+	/* else WB access */
+	if (age > 3)
+		age = 3;
+
+	bits |= (1 << 11);
+
+	age_bits = (3 - age) << 1;
+
+	if (level == I915_CACHE_ELLC) {
+		age_bits |= 0x4;
+	}
+
+	return bits | age_bits;
+}
+
 static inline uint32_t pte_encode(struct drm_device *dev,
 				  dma_addr_t addr,
 			          enum i915_cache_level level)
@@ -38,6 +84,8 @@ static inline uint32_t pte_encode(struct drm_device *dev,
 	if (IS_HASWELL(dev)) {
 		pte |= HSW_PTE_ADDR_ENCODE(addr);
 		switch (level) {
+		case I915_CACHE_LLC_ELLC:
+		case I915_CACHE_ELLC:
 		case I915_CACHE_LLC:
 			pte |= GEN6_PTE_CACHE_LLC;
 			break;
@@ -52,10 +100,12 @@ static inline uint32_t pte_encode(struct drm_device *dev,
 		case I915_CACHE_LLC_MLC:
 			pte |= GEN6_PTE_CACHE_LLC_MLC;
 			break;
+		case I915_CACHE_LLC_ELLC:
 		case I915_CACHE_LLC:
 			pte |= GEN6_PTE_CACHE_LLC;
 			break;
 		default:
+		case I915_CACHE_ELLC:
 		case I915_CACHE_NONE:
 			pte |= GEN6_PTE_UNCACHED;
 			break;
