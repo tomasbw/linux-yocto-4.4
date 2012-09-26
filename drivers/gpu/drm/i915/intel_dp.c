@@ -79,8 +79,7 @@ static bool is_cpu_edp(struct intel_dp *intel_dp)
 
 static struct intel_dp *intel_attached_dp(struct drm_connector *connector)
 {
-	return container_of(intel_attached_encoder(connector),
-			    struct intel_dp, base);
+	return enc_to_intel_dp(&intel_attached_encoder(connector)->base);
 }
 
 /**
@@ -108,7 +107,7 @@ void
 intel_edp_link_config(struct intel_encoder *intel_encoder,
 		       int *lane_num, int *link_bw)
 {
-	struct intel_dp *intel_dp = container_of(intel_encoder, struct intel_dp, base);
+	struct intel_dp *intel_dp = enc_to_intel_dp(&intel_encoder->base);
 
 	*lane_num = intel_dp->lane_count;
 	if (intel_dp->link_bw == DP_LINK_BW_1_62)
@@ -121,7 +120,7 @@ int
 intel_edp_target_clock(struct intel_encoder *intel_encoder,
 		       struct drm_display_mode *mode)
 {
-	struct intel_dp *intel_dp = container_of(intel_encoder, struct intel_dp, base);
+	struct intel_dp *intel_dp = enc_to_intel_dp(&intel_encoder->base);
 
 	if (intel_dp->panel_fixed_mode)
 		return intel_dp->panel_fixed_mode->clock;
@@ -784,7 +783,8 @@ intel_dp_set_m_n(struct drm_crtc *crtc, struct drm_display_mode *mode,
 		 struct drm_display_mode *adjusted_mode)
 {
 	struct drm_device *dev = crtc->dev;
-	struct intel_encoder *encoder;
+	struct intel_encoder *intel_encoder;
+	struct intel_dp *intel_dp;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	int lane_count = 4;
@@ -795,11 +795,11 @@ intel_dp_set_m_n(struct drm_crtc *crtc, struct drm_display_mode *mode,
 	/*
 	 * Find the lane count in the intel_encoder private
 	 */
-	for_each_encoder_on_crtc(dev, crtc, encoder) {
-		struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
+	for_each_encoder_on_crtc(dev, crtc, intel_encoder) {
+		intel_dp = enc_to_intel_dp(&intel_encoder->base);
 
-		if (intel_dp->base.type == INTEL_OUTPUT_DISPLAYPORT ||
-		    intel_dp->base.type == INTEL_OUTPUT_EDP)
+		if (intel_encoder->type == INTEL_OUTPUT_DISPLAYPORT ||
+		    intel_encoder->type == INTEL_OUTPUT_EDP)
 		{
 			lane_count = intel_dp->lane_count;
 			break;
@@ -861,7 +861,7 @@ intel_dp_mode_set(struct drm_encoder *encoder, struct drm_display_mode *mode,
 	struct drm_device *dev = encoder->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
-	struct drm_crtc *crtc = intel_dp->base.base.crtc;
+	struct drm_crtc *crtc = encoder->crtc;
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 
 	/*
@@ -2370,7 +2370,7 @@ static enum drm_connector_status
 intel_dp_detect(struct drm_connector *connector, bool force)
 {
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = connector->dev;
 	enum drm_connector_status status;
 	struct edid *edid = NULL;
 
@@ -2407,7 +2407,7 @@ intel_dp_detect(struct drm_connector *connector, bool force)
 static int intel_dp_get_modes(struct drm_connector *connector)
 {
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = connector->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 
@@ -2581,7 +2581,7 @@ static const struct drm_encoder_funcs intel_dp_enc_funcs = {
 static void
 intel_dp_hot_plug(struct intel_encoder *intel_encoder)
 {
-	struct intel_dp *intel_dp = container_of(intel_encoder, struct intel_dp, base);
+	struct intel_dp *intel_dp = enc_to_intel_dp(&intel_encoder->base);
 
 	intel_dp_check_link_status(intel_dp);
 }
@@ -2591,13 +2591,14 @@ int
 intel_trans_dp_port_sel(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
-	struct intel_encoder *encoder;
+	struct intel_encoder *intel_encoder;
+	struct intel_dp *intel_dp;
 
-	for_each_encoder_on_crtc(dev, crtc, encoder) {
-		struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
+	for_each_encoder_on_crtc(dev, crtc, intel_encoder) {
+		intel_dp = enc_to_intel_dp(&intel_encoder->base);
 
-		if (intel_dp->base.type == INTEL_OUTPUT_DISPLAYPORT ||
-		    intel_dp->base.type == INTEL_OUTPUT_EDP)
+		if (intel_encoder->type == INTEL_OUTPUT_DISPLAYPORT ||
+		    intel_encoder->type == INTEL_OUTPUT_EDP)
 			return intel_dp->output_reg;
 	}
 
@@ -2754,7 +2755,7 @@ intel_dp_init(struct drm_device *dev, int output_reg, enum port port)
 
 		if (!pp_on || !pp_off || !pp_div) {
 			DRM_INFO("bad panel power sequencing delays, disabling panel\n");
-			intel_dp_encoder_destroy(&intel_dp->base.base);
+			intel_dp_encoder_destroy(&intel_encoder->base);
 			intel_dp_destroy(&intel_connector->base);
 			return;
 		}
@@ -2817,7 +2818,7 @@ intel_dp_init(struct drm_device *dev, int output_reg, enum port port)
 		} else {
 			/* if this fails, presume the device is a ghost */
 			DRM_INFO("failed to retrieve link info, disabling eDP\n");
-			intel_dp_encoder_destroy(&intel_dp->base.base);
+			intel_dp_encoder_destroy(&intel_encoder->base);
 			intel_dp_destroy(&intel_connector->base);
 			return;
 		}
