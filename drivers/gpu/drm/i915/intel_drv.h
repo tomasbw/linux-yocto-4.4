@@ -319,10 +319,8 @@ struct dip_infoframe {
 } __attribute__((packed));
 
 struct intel_hdmi {
-	struct intel_encoder base;
 	u32 sdvox_reg;
 	int ddc_bus;
-	int ddi_port;
 	uint32_t color_range;
 	bool has_hdmi_sink;
 	bool has_audio;
@@ -338,13 +336,11 @@ struct intel_hdmi {
 #define DP_LINK_CONFIGURATION_SIZE	9
 
 struct intel_dp {
-	struct intel_encoder base;
 	uint32_t output_reg;
 	uint32_t DP;
 	uint8_t  link_configuration[DP_LINK_CONFIGURATION_SIZE];
 	bool has_audio;
 	enum hdmi_force_audio force_audio;
-	enum port port;
 	uint32_t color_range;
 	uint8_t link_bw;
 	uint8_t lane_count;
@@ -364,6 +360,13 @@ struct intel_dp {
 	bool want_panel_vdd;
 	struct edid *edid; /* cached EDID for eDP */
 	int edid_mode_count;
+};
+
+struct intel_digital_port {
+	struct intel_encoder base;
+	enum port port;
+	struct intel_dp dp;
+	struct intel_hdmi hdmi;
 };
 
 static inline struct drm_crtc *
@@ -487,7 +490,27 @@ static inline struct intel_encoder *intel_attached_encoder(struct drm_connector 
 
 static inline struct intel_dp *enc_to_intel_dp(struct drm_encoder *encoder)
 {
-	return container_of(encoder, struct intel_dp, base.base);
+	struct intel_digital_port *intel_dig_port =
+		container_of(encoder, struct intel_digital_port, base.base);
+	return &intel_dig_port->dp;
+}
+
+static inline struct intel_digital_port *
+enc_to_dig_port(struct drm_encoder *encoder)
+{
+	return container_of(encoder, struct intel_digital_port, base.base);
+}
+
+static inline struct intel_digital_port *
+dp_to_dig_port(struct intel_dp *intel_dp)
+{
+	return container_of(intel_dp, struct intel_digital_port, dp);
+}
+
+static inline struct intel_digital_port *
+hdmi_to_dig_port(struct intel_hdmi *intel_hdmi)
+{
+	return container_of(intel_hdmi, struct intel_digital_port, hdmi);
 }
 
 extern void intel_connector_attach_encoder(struct intel_connector *connector,

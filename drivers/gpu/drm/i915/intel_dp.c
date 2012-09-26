@@ -50,7 +50,9 @@
  */
 static bool is_edp(struct intel_dp *intel_dp)
 {
-	return intel_dp->base.type == INTEL_OUTPUT_EDP;
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+
+	return intel_dig_port->base.type == INTEL_OUTPUT_EDP;
 }
 
 /**
@@ -79,7 +81,9 @@ static bool is_cpu_edp(struct intel_dp *intel_dp)
 
 static struct drm_device *intel_dp_to_dev(struct intel_dp *intel_dp)
 {
-	return intel_dp->base.base.dev;
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+
+	return intel_dig_port->base.base.dev;
 }
 
 static struct intel_dp *intel_attached_dp(struct drm_connector *connector)
@@ -348,7 +352,8 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 		uint8_t *recv, int recv_size)
 {
 	uint32_t output_reg = intel_dp->output_reg;
-	struct drm_device *dev = intel_dp_to_dev(intel_dp);
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = intel_dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t ch_ctl = output_reg + 0x10;
 	uint32_t ch_data = ch_ctl + 4;
@@ -359,7 +364,7 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 	int try, precharge;
 
 	if (IS_HASWELL(dev)) {
-		switch (intel_dp->port) {
+		switch (intel_dig_port->port) {
 		case PORT_A:
 			ch_ctl = DPA_AUX_CH_CTL;
 			ch_data = DPA_AUX_CH_DATA1;
@@ -1222,8 +1227,9 @@ void ironlake_edp_backlight_off(struct intel_dp *intel_dp)
 
 static void ironlake_edp_pll_on(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp_to_dev(intel_dp);
-	struct drm_crtc *crtc = intel_dp->base.base.crtc;
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_crtc *crtc = intel_dig_port->base.base.crtc;
+	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 dpa_ctl;
 
@@ -1247,8 +1253,9 @@ static void ironlake_edp_pll_on(struct intel_dp *intel_dp)
 
 static void ironlake_edp_pll_off(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp_to_dev(intel_dp);
-	struct drm_crtc *crtc = intel_dp->base.base.crtc;
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_crtc *crtc = intel_dig_port->base.base.crtc;
+	struct drm_device *dev = crtc->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 dpa_ctl;
 
@@ -1758,13 +1765,15 @@ intel_dp_set_link_train(struct intel_dp *intel_dp,
 			uint32_t dp_reg_value,
 			uint8_t dp_train_pat)
 {
-	struct drm_device *dev = intel_dp_to_dev(intel_dp);
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = intel_dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
+	enum port port = intel_dig_port->port;
 	int ret;
 	uint32_t temp;
 
 	if (IS_HASWELL(dev)) {
-		temp = I915_READ(DP_TP_CTL(intel_dp->port));
+		temp = I915_READ(DP_TP_CTL(port));
 
 		if (dp_train_pat & DP_LINK_SCRAMBLING_DISABLE)
 			temp |= DP_TP_CTL_SCRAMBLE_DISABLE;
@@ -1775,9 +1784,9 @@ intel_dp_set_link_train(struct intel_dp *intel_dp,
 		switch (dp_train_pat & DP_TRAINING_PATTERN_MASK) {
 		case DP_TRAINING_PATTERN_DISABLE:
 			temp |= DP_TP_CTL_LINK_TRAIN_IDLE;
-			I915_WRITE(DP_TP_CTL(intel_dp->port), temp);
+			I915_WRITE(DP_TP_CTL(port), temp);
 
-			if (wait_for((I915_READ(DP_TP_STATUS(intel_dp->port)) &
+			if (wait_for((I915_READ(DP_TP_STATUS(port)) &
 				      DP_TP_STATUS_IDLE_DONE) == 0, 1))
 				DRM_ERROR("Timed out waiting for DP idle patterns\n");
 
@@ -1795,7 +1804,7 @@ intel_dp_set_link_train(struct intel_dp *intel_dp,
 			temp |= DP_TP_CTL_LINK_TRAIN_PAT3;
 			break;
 		}
-		I915_WRITE(DP_TP_CTL(intel_dp->port), temp);
+		I915_WRITE(DP_TP_CTL(port), temp);
 
 	} else if (HAS_PCH_CPT(dev) &&
 		   (IS_GEN7(dev) || !is_cpu_edp(intel_dp))) {
@@ -1861,7 +1870,7 @@ intel_dp_set_link_train(struct intel_dp *intel_dp,
 void
 intel_dp_start_link_train(struct intel_dp *intel_dp)
 {
-	struct drm_encoder *encoder = &intel_dp->base.base;
+	struct drm_encoder *encoder = &dp_to_dig_port(intel_dp)->base.base;
 	struct drm_device *dev = encoder->dev;
 	int i;
 	uint8_t voltage;
@@ -2039,7 +2048,8 @@ intel_dp_complete_link_train(struct intel_dp *intel_dp)
 static void
 intel_dp_link_down(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp_to_dev(intel_dp);
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_device *dev = intel_dig_port->base.base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t DP = intel_dp->DP;
 
@@ -2079,7 +2089,7 @@ intel_dp_link_down(struct intel_dp *intel_dp)
 
 	if (HAS_PCH_IBX(dev) &&
 	    I915_READ(intel_dp->output_reg) & DP_PIPEB_SELECT) {
-		struct drm_crtc *crtc = intel_dp->base.base.crtc;
+		struct drm_crtc *crtc = intel_dig_port->base.base.crtc;
 
 		/* Hardware workaround: leaving our transcoder select
 		 * set to transcoder B while it's off will prevent the
@@ -2195,13 +2205,14 @@ intel_dp_handle_test_request(struct intel_dp *intel_dp)
 static void
 intel_dp_check_link_status(struct intel_dp *intel_dp)
 {
+	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
 	u8 sink_irq_vector;
 	u8 link_status[DP_LINK_STATUS_SIZE];
 
-	if (!intel_dp->base.connectors_active)
+	if (!intel_encoder->connectors_active)
 		return;
 
-	if (WARN_ON(!intel_dp->base.base.crtc))
+	if (WARN_ON(!intel_encoder->base.crtc))
 		return;
 
 	/* Try to read receiver status if the link appears to be up */
@@ -2232,7 +2243,7 @@ intel_dp_check_link_status(struct intel_dp *intel_dp)
 
 	if (!intel_channel_eq_ok(intel_dp, link_status)) {
 		DRM_DEBUG_KMS("%s: channel EQ not ok, retraining\n",
-			      drm_get_encoder_name(&intel_dp->base.base));
+			      drm_get_encoder_name(&intel_encoder->base));
 		intel_dp_start_link_train(intel_dp);
 		intel_dp_complete_link_train(intel_dp);
 	}
@@ -2479,7 +2490,8 @@ intel_dp_set_property(struct drm_connector *connector,
 		      uint64_t val)
 {
 	struct drm_i915_private *dev_priv = connector->dev->dev_private;
-	struct intel_dp *intel_dp = intel_attached_dp(connector);
+	struct intel_encoder *intel_encoder = intel_attached_encoder(connector);
+	struct intel_dp *intel_dp = enc_to_intel_dp(&intel_encoder->base);
 	int ret;
 
 	ret = drm_connector_property_set_value(connector, property, val);
@@ -2518,8 +2530,8 @@ intel_dp_set_property(struct drm_connector *connector,
 	return -EINVAL;
 
 done:
-	if (intel_dp->base.base.crtc) {
-		struct drm_crtc *crtc = intel_dp->base.base.crtc;
+	if (intel_encoder->base.crtc) {
+		struct drm_crtc *crtc = intel_encoder->base.crtc;
 		intel_set_mode(crtc, &crtc->mode,
 			       crtc->x, crtc->y, crtc->fb);
 	}
@@ -2542,7 +2554,8 @@ intel_dp_destroy(struct drm_connector *connector)
 
 static void intel_dp_encoder_destroy(struct drm_encoder *encoder)
 {
-	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+	struct intel_digital_port *intel_dig_port = enc_to_dig_port(encoder);
+	struct intel_dp *intel_dp = &intel_dig_port->dp;
 
 	i2c_del_adapter(&intel_dp->adapter);
 	drm_encoder_cleanup(encoder);
@@ -2551,7 +2564,7 @@ static void intel_dp_encoder_destroy(struct drm_encoder *encoder)
 		cancel_delayed_work_sync(&intel_dp->panel_vdd_work);
 		ironlake_panel_vdd_off_sync(intel_dp);
 	}
-	kfree(intel_dp);
+	kfree(intel_dig_port);
 }
 
 static const struct drm_encoder_helper_funcs intel_dp_helper_funcs = {
@@ -2646,24 +2659,27 @@ intel_dp_init(struct drm_device *dev, int output_reg, enum port port)
 	struct intel_dp *intel_dp;
 	struct intel_encoder *intel_encoder;
 	struct intel_connector *intel_connector;
+	struct intel_digital_port *intel_dig_port;
 	const char *name = NULL;
 	int type;
 
-	intel_dp = kzalloc(sizeof(struct intel_dp), GFP_KERNEL);
-	if (!intel_dp)
+	intel_dig_port = kzalloc(sizeof(struct intel_digital_port), GFP_KERNEL);
+	if (!intel_dig_port)
 		return;
 
+	intel_dig_port->port = port;
+
+	intel_dp = &intel_dig_port->dp;
 	intel_dp->output_reg = output_reg;
-	intel_dp->port = port;
 	/* Preserve the current hw state. */
 	intel_dp->DP = I915_READ(intel_dp->output_reg);
 
 	intel_connector = kzalloc(sizeof(struct intel_connector), GFP_KERNEL);
 	if (!intel_connector) {
-		kfree(intel_dp);
+		kfree(intel_dig_port);
 		return;
 	}
-	intel_encoder = &intel_dp->base;
+	intel_encoder = &intel_dig_port->base;
 
 	if (HAS_PCH_SPLIT(dev) && output_reg == PCH_DP_D)
 		if (intel_dpd_is_edp(dev))
