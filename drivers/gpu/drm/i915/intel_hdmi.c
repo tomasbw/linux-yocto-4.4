@@ -939,7 +939,7 @@ static const struct drm_encoder_funcs intel_hdmi_enc_funcs = {
 };
 
 static void
-intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi, struct drm_connector *connector)
+intel_hdmi_add_properties(struct drm_connector *connector)
 {
 	intel_attach_force_audio_property(connector);
 	intel_attach_broadcast_rgb_property(connector);
@@ -1040,7 +1040,7 @@ void intel_hdmi_init(struct drm_device *dev, int sdvox_reg, enum port port)
 	intel_connector->get_hw_state = intel_connector_get_hw_state;
 
 
-	intel_hdmi_add_properties(intel_hdmi, connector);
+	intel_hdmi_add_properties(connector);
 
 	intel_connector_attach_encoder(intel_connector, intel_encoder);
 	drm_sysfs_connector_add(connector);

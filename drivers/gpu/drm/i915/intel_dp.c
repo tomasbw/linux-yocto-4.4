@@ -2645,7 +2645,7 @@ bool intel_dpd_is_edp(struct drm_device *dev)
 }
 
 static void
-intel_dp_add_properties(struct intel_dp *intel_dp, struct drm_connector *connector)
+intel_dp_add_properties(struct drm_connector *connector)
 {
 	intel_attach_force_audio_property(connector);
 	intel_attach_broadcast_rgb_property(connector);
@@ -2865,7 +2865,7 @@ intel_dp_init(struct drm_device *dev, int output_reg, enum port port)
 		intel_panel_setup_backlight(dev);
 	}
 
-	intel_dp_add_properties(intel_dp, connector);
+	intel_dp_add_properties(connector);
 
 	/* For G4X desktop chip, PEG_BAND_GAP_DATA 3:0 must first be written
 	 * 0xd.  Failure to do so will result in spurious interrupts being
