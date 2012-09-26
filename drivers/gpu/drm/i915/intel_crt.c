@@ -463,7 +463,9 @@ intel_crt_load_detect(struct intel_crt *crt)
 {
 	struct drm_device *dev = crt->base.base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	uint32_t pipe = to_intel_crtc(crt->base.base.crtc)->pipe;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crt->base.base.crtc);
+	enum pipe pipe = intel_crtc->pipe;
+	enum transcoder cpu_transcoder = intel_crtc->cpu_transcoder;
 	uint32_t save_bclrpat;
 	uint32_t save_vtotal;
 	uint32_t vtotal, vactive;
@@ -485,7 +487,7 @@ intel_crt_load_detect(struct intel_crt *crt)
 	vtotal_reg = VTOTAL(pipe);
 	vblank_reg = VBLANK(pipe);
 	vsync_reg = VSYNC(pipe);
-	pipeconf_reg = PIPECONF(pipe);
+	pipeconf_reg = PIPECONF(cpu_transcoder);
 	pipe_dsl_reg = PIPEDSL(pipe);
 
 	save_bclrpat = I915_READ(bclrpat_reg);
