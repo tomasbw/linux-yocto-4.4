@@ -701,7 +701,7 @@ intel_dp_i2c_init(struct intel_dp *intel_dp,
 	return ret;
 }
 
-static bool
+bool
 intel_dp_mode_fixup(struct drm_encoder *encoder,
 		    const struct drm_display_mode *mode,
 		    struct drm_display_mode *adjusted_mode)
@@ -2202,7 +2202,7 @@ intel_dp_handle_test_request(struct intel_dp *intel_dp)
  *  4. Check link status on receipt of hot-plug interrupt
  */
 
-static void
+void
 intel_dp_check_link_status(struct intel_dp *intel_dp)
 {
 	struct intel_encoder *intel_encoder = &dp_to_dig_port(intel_dp)->base;
@@ -2556,7 +2556,7 @@ intel_dp_destroy(struct drm_connector *connector)
 	kfree(connector);
 }
 
-static void intel_dp_encoder_destroy(struct drm_encoder *encoder)
+void intel_dp_encoder_destroy(struct drm_encoder *encoder)
 {
 	struct intel_digital_port *intel_dig_port = enc_to_dig_port(encoder);
 	struct intel_dp *intel_dp = &intel_dig_port->dp;
@@ -2574,12 +2574,6 @@ static void intel_dp_encoder_destroy(struct drm_encoder *encoder)
 static const struct drm_encoder_helper_funcs intel_dp_helper_funcs = {
 	.mode_fixup = intel_dp_mode_fixup,
 	.mode_set = intel_dp_mode_set,
-	.disable = intel_encoder_noop,
-};
-
-static const struct drm_encoder_helper_funcs intel_dp_helper_funcs_hsw = {
-	.mode_fixup = intel_dp_mode_fixup,
-	.mode_set = intel_ddi_mode_set,
 	.disable = intel_encoder_noop,
 };
 
@@ -2655,7 +2649,7 @@ intel_dp_add_properties(struct drm_connector *connector)
 	intel_attach_broadcast_rgb_property(connector);
 }
 
-static void
+void
 intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 			struct intel_connector *intel_connector)
 {
@@ -2687,7 +2681,8 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 		intel_encoder->type = INTEL_OUTPUT_EDP;
 	} else {
 		type = DRM_MODE_CONNECTOR_DisplayPort;
-		intel_encoder->type = INTEL_OUTPUT_DISPLAYPORT;
+		/* The intel_encoder->type value may be UNKNOWN for DDI or DP
+		 * for the older gens, so don't rewrite it. */
 	}
 
 	drm_connector_init(dev, connector, &intel_dp_connector_funcs, type);
@@ -2863,32 +2858,19 @@ intel_dp_init(struct drm_device *dev, int output_reg, enum port port)
 
 	drm_encoder_init(dev, &intel_encoder->base, &intel_dp_enc_funcs,
 			 DRM_MODE_ENCODER_TMDS);
+	drm_encoder_helper_add(&intel_encoder->base, &intel_dp_helper_funcs);
 
-	if (IS_HASWELL(dev))
-		drm_encoder_helper_add(&intel_encoder->base,
-				       &intel_dp_helper_funcs_hsw);
-	else
-		drm_encoder_helper_add(&intel_encoder->base,
-				       &intel_dp_helper_funcs);
-
-	if (IS_HASWELL(dev)) {
-		intel_encoder->enable = intel_enable_ddi;
-		intel_encoder->pre_enable = intel_ddi_pre_enable;
-		intel_encoder->disable = intel_disable_ddi;
-		intel_encoder->post_disable = intel_ddi_post_disable;
-		intel_encoder->get_hw_state = intel_ddi_get_hw_state;
-	} else {
-		intel_encoder->enable = intel_enable_dp;
-		intel_encoder->pre_enable = intel_pre_enable_dp;
-		intel_encoder->disable = intel_disable_dp;
-		intel_encoder->post_disable = intel_post_disable_dp;
-		intel_encoder->get_hw_state = intel_dp_get_hw_state;
-	}
+	intel_encoder->enable = intel_enable_dp;
+	intel_encoder->pre_enable = intel_pre_enable_dp;
+	intel_encoder->disable = intel_disable_dp;
+	intel_encoder->post_disable = intel_post_disable_dp;
+	intel_encoder->get_hw_state = intel_dp_get_hw_state;
 
 	intel_dig_port->port = port;
 	intel_dig_port->hdmi.sdvox_reg = 0;
 	intel_dig_port->dp.output_reg = output_reg;
 
+	intel_encoder->type = INTEL_OUTPUT_DISPLAYPORT;
 	intel_encoder->crtc_mask = (1 << 0) | (1 << 1) | (1 << 2);
 	intel_encoder->cloneable = false;
 	intel_encoder->hot_plug = intel_dp_hot_plug;
