@@ -77,6 +77,11 @@ static bool is_cpu_edp(struct intel_dp *intel_dp)
 	return is_edp(intel_dp) && !is_pch_edp(intel_dp);
 }
 
+static struct drm_device *intel_dp_to_dev(struct intel_dp *intel_dp)
+{
+	return intel_dp->base.base.dev;
+}
+
 static struct intel_dp *intel_attached_dp(struct drm_connector *connector)
 {
 	return enc_to_intel_dp(&intel_attached_encoder(connector)->base);
@@ -307,7 +312,7 @@ intel_hrawclk(struct drm_device *dev)
 
 static bool ironlake_edp_have_panel_power(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	return (I915_READ(PCH_PP_STATUS) & PP_ON) != 0;
@@ -315,7 +320,7 @@ static bool ironlake_edp_have_panel_power(struct intel_dp *intel_dp)
 
 static bool ironlake_edp_have_panel_vdd(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	return (I915_READ(PCH_PP_CONTROL) & EDP_FORCE_VDD) != 0;
@@ -324,7 +329,7 @@ static bool ironlake_edp_have_panel_vdd(struct intel_dp *intel_dp)
 static void
 intel_dp_check_edp(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	if (!is_edp(intel_dp))
@@ -343,7 +348,7 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 		uint8_t *recv, int recv_size)
 {
 	uint32_t output_reg = intel_dp->output_reg;
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t ch_ctl = output_reg + 0x10;
 	uint32_t ch_data = ch_ctl + 4;
@@ -968,7 +973,7 @@ static void ironlake_wait_panel_status(struct intel_dp *intel_dp,
 				       u32 mask,
 				       u32 value)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	DRM_DEBUG_KMS("mask %08x value %08x status %08x control %08x\n",
@@ -1017,7 +1022,7 @@ static  u32 ironlake_get_pp_control(struct drm_i915_private *dev_priv)
 
 void ironlake_edp_panel_vdd_on(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 pp;
 
@@ -1056,7 +1061,7 @@ void ironlake_edp_panel_vdd_on(struct intel_dp *intel_dp)
 
 static void ironlake_panel_vdd_off_sync(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 pp;
 
@@ -1078,7 +1083,7 @@ static void ironlake_panel_vdd_work(struct work_struct *__work)
 {
 	struct intel_dp *intel_dp = container_of(to_delayed_work(__work),
 						 struct intel_dp, panel_vdd_work);
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 
 	mutex_lock(&dev->mode_config.mutex);
 	ironlake_panel_vdd_off_sync(intel_dp);
@@ -1110,7 +1115,7 @@ void ironlake_edp_panel_vdd_off(struct intel_dp *intel_dp, bool sync)
 
 void ironlake_edp_panel_on(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 pp;
 
@@ -1152,7 +1157,7 @@ void ironlake_edp_panel_on(struct intel_dp *intel_dp)
 
 void ironlake_edp_panel_off(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 pp;
 
@@ -1177,7 +1182,7 @@ void ironlake_edp_panel_off(struct intel_dp *intel_dp)
 
 void ironlake_edp_backlight_on(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 pp;
 
@@ -1200,7 +1205,7 @@ void ironlake_edp_backlight_on(struct intel_dp *intel_dp)
 
 void ironlake_edp_backlight_off(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 pp;
 
@@ -1217,7 +1222,7 @@ void ironlake_edp_backlight_off(struct intel_dp *intel_dp)
 
 static void ironlake_edp_pll_on(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_crtc *crtc = intel_dp->base.base.crtc;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 dpa_ctl;
@@ -1242,7 +1247,7 @@ static void ironlake_edp_pll_on(struct intel_dp *intel_dp)
 
 static void ironlake_edp_pll_off(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_crtc *crtc = intel_dp->base.base.crtc;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32 dpa_ctl;
@@ -1485,7 +1490,7 @@ static char	*link_train_names[] = {
 static uint8_t
 intel_dp_voltage_max(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 
 	if (IS_GEN7(dev) && is_cpu_edp(intel_dp))
 		return DP_TRAIN_VOLTAGE_SWING_800;
@@ -1498,7 +1503,7 @@ intel_dp_voltage_max(struct intel_dp *intel_dp)
 static uint8_t
 intel_dp_pre_emphasis_max(struct intel_dp *intel_dp, uint8_t voltage_swing)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 
 	if (IS_HASWELL(dev)) {
 		switch (voltage_swing & DP_TRAIN_VOLTAGE_SWING_MASK) {
@@ -1753,7 +1758,7 @@ intel_dp_set_link_train(struct intel_dp *intel_dp,
 			uint32_t dp_reg_value,
 			uint8_t dp_train_pat)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret;
 	uint32_t temp;
@@ -1955,7 +1960,7 @@ intel_dp_start_link_train(struct intel_dp *intel_dp)
 void
 intel_dp_complete_link_train(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	bool channel_eq = false;
 	int tries, cr_tries;
 	uint32_t DP = intel_dp->DP;
@@ -2034,7 +2039,7 @@ intel_dp_complete_link_train(struct intel_dp *intel_dp)
 static void
 intel_dp_link_down(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t DP = intel_dp->DP;
 
@@ -2276,11 +2281,12 @@ intel_dp_detect_dpcd(struct intel_dp *intel_dp)
 static enum drm_connector_status
 ironlake_dp_detect(struct intel_dp *intel_dp)
 {
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	enum drm_connector_status status;
 
 	/* Can't disconnect eDP, but you can close the lid... */
 	if (is_edp(intel_dp)) {
-		status = intel_panel_detect(intel_dp->base.base.dev);
+		status = intel_panel_detect(dev);
 		if (status == connector_status_unknown)
 			status = connector_status_connected;
 		return status;
@@ -2292,7 +2298,7 @@ ironlake_dp_detect(struct intel_dp *intel_dp)
 static enum drm_connector_status
 g4x_dp_detect(struct intel_dp *intel_dp)
 {
-	struct drm_device *dev = intel_dp->base.base.dev;
+	struct drm_device *dev = intel_dp_to_dev(intel_dp);
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	uint32_t bit;
 
