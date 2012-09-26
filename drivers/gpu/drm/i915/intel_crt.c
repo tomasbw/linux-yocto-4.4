@@ -484,9 +484,9 @@ intel_crt_load_detect(struct intel_crt *crt)
 	DRM_DEBUG_KMS("starting load-detect on CRT\n");
 
 	bclrpat_reg = BCLRPAT(pipe);
-	vtotal_reg = VTOTAL(pipe);
-	vblank_reg = VBLANK(pipe);
-	vsync_reg = VSYNC(pipe);
+	vtotal_reg = VTOTAL(cpu_transcoder);
+	vblank_reg = VBLANK(cpu_transcoder);
+	vsync_reg = VSYNC(cpu_transcoder);
 	pipeconf_reg = PIPECONF(cpu_transcoder);
 	pipe_dsl_reg = PIPEDSL(pipe);
 
