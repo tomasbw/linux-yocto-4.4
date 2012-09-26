@@ -3208,7 +3208,27 @@ int i915_gem_get_caching_ioctl(struct drm_device *dev, void *data,
 		goto unlock;
 	}
 
-	args->caching = obj->cache.level != I915_CACHE_NONE;
+	if (IS_HASWELL(dev)) {
+		args->caching = I915_CACHING_ARCH_HSW;
+		switch (obj->cache.level) {
+		case I915_CACHE_LLC:
+			args->caching |= HSW_CACHE_LLC;
+			break;
+		case I915_CACHE_ELLC:
+			args->caching |= HSW_CACHE_ELLC;
+			break;
+		case I915_CACHE_LLC_ELLC:
+			args->caching |= HSW_CACHE_ELLC;
+			args->caching |= HSW_CACHE_LLC;
+			break;
+		case I915_CACHE_NONE:
+		default:
+			break;
+		}
+		args->caching |= obj->cache.policy << HSW_CACHE_POLICY_SHIFT;
+		args->caching |= obj->cache.age << HSW_CACHE_AGE_SHIFT;
+	} else
+		args->caching = obj->cache.level != I915_CACHE_NONE;
 
 	drm_gem_object_unreference(&obj->base);
 unlock:
@@ -3227,15 +3247,36 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 	};
 	int ret;
 
-	switch (args->caching) {
-	case I915_CACHING_NONE:
-		cache.level = I915_CACHE_NONE;
-		break;
-	case I915_CACHING_CACHED:
-		cache.level = I915_CACHE_LLC;
-		break;
-	default:
-		return -EINVAL;
+	if ((args->caching >> I915_ARCH_SHIFT) == I915_ARCH_HSW) {
+		cache.policy = HSW_CACHE_POLICY(args->caching);
+		cache.age = HSW_CACHE_AGE(args->caching);
+		switch(args->caching & HSW_CACHE_LEVEL_MASK) {
+		case HSW_CACHE_NONE:
+			cache.level = I915_CACHE_NONE;
+			break;
+		case HSW_CACHE_LLC:
+			cache.level = I915_CACHE_LLC;
+			break;
+		case HSW_CACHE_ELLC:
+			cache.level = I915_CACHE_ELLC;
+			break;
+		case (HSW_CACHE_ELLC | HSW_CACHE_LLC):
+			cache.level = I915_CACHE_LLC_ELLC;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else {
+		switch (args->caching) {
+		case I915_CACHING_NONE:
+			cache.level = I915_CACHE_NONE;
+			break;
+		case I915_CACHING_CACHED:
+			cache.level = I915_CACHE_LLC;
+			break;
+		default:
+			return -EINVAL;
+		}
 	}
 
 	ret = i915_mutex_lock_interruptible(dev);

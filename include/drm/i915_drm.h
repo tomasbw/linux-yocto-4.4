@@ -718,6 +718,27 @@ struct drm_i915_gem_busy {
 #define I915_CACHING_NONE		0
 #define I915_CACHING_CACHED		1
 
+#define I915_ARCH_HSW			1
+#define I915_ARCH_SHIFT			16
+#define I915_CACHING_ARCH_HSW		(I915_ARCH_HSW << I915_ARCH_SHIFT)
+#define    HSW_CACHE_POLICY_SHIFT	0
+#define    HSW_CACHE_POLICY_MASK	(1 << HSW_CACHE_POLICY_SHIFT)
+#define    HSW_CACHE_POLICY(caching)	((caching) & HSW_CACHE_POLICY_MASK)
+#define       HSW_CACHE_WB		0
+#define       HSW_CACHE_WT		1
+#define    HSW_CACHE_AGE_SHIFT		1
+#define    HSW_CACHE_AGE_MASK		(3 << HSW_CACHE_AGE_SHIFT)
+#define    HSW_CACHE_AGE(caching)	(((caching) & HSW_CACHE_AGE_MASK) >> HSW_CACHE_AGE_SHIFT)
+#define       HSW_CACHE_AGE_0		(0 << 1)
+#define       HSW_CACHE_AGE_1		(1 << 1)
+#define       HSW_CACHE_AGE_2		(2 << 1)
+#define       HSW_CACHE_AGE_3		(3 << 1)
+#define    HSW_CACHE_LEVEL_SHIFT	3
+#define    HSW_CACHE_LEVEL_MASK		(3 << HSW_CACHE_LEVEL_SHIFT)
+#define    HSW_CACHE_LEVEL(caching)	(((caching) & HSW_CACHE_LEVEL_MASK) >> HSW_CACHE_LEVEL_SHIFT)
+#define       HSW_CACHE_NONE		(0 << 3)
+#define       HSW_CACHE_LLC		(1 << 3)
+#define       HSW_CACHE_ELLC		(2 << 3)
 struct drm_i915_gem_caching {
 	/**
 	 * Handle of the buffer to set/get the caching level of. */
