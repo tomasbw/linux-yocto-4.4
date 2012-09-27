@@ -84,17 +84,8 @@ static inline uint32_t pte_encode(struct drm_device *dev,
 
 	if (IS_HASWELL(dev)) {
 		pte |= HSW_PTE_ADDR_ENCODE(addr);
-		switch (level) {
-		case I915_CACHE_LLC_ELLC:
-		case I915_CACHE_ELLC:
-		case I915_CACHE_LLC:
-			pte |= GEN6_PTE_CACHE_LLC;
-			break;
-		case I915_CACHE_LLC_MLC:
-		case I915_CACHE_NONE:
-			pte |= HSW_PTE_UNCACHED;
-			break;
-		}
+		pte |= lookup_haswell_cache_bits(dev->dev_private, level,
+						 pol, age);
 	} else {
 		pte |= GEN6_PTE_ADDR_ENCODE(addr);
 		switch (level) {
@@ -306,7 +297,7 @@ void i915_ppgtt_bind_object(struct i915_hw_ppgtt *ppgtt,
 	i915_ppgtt_insert_sg_entries(ppgtt,
 				     obj->pages,
 				     obj->gtt_space->start >> PAGE_SHIFT,
-				     cache.level, I915_CACHE_WB, 3);
+				     cache.level, cache.policy, cache.age);
 }
 
 void i915_ppgtt_unbind_object(struct i915_hw_ppgtt *ppgtt,
@@ -319,11 +310,19 @@ void i915_ppgtt_unbind_object(struct i915_hw_ppgtt *ppgtt,
 
 /* XXX kill agp_type! */
 static unsigned int cache_level_to_agp_type(struct drm_device *dev,
-					    enum i915_cache_level cache_level)
+					    struct drm_i915_cache_attributes cache)
 {
-	switch (cache_level) {
+	if (IS_HASWELL(dev)) {
+		unsigned int ret;
+		ret = pte_encode(dev, 0, cache.level, cache.policy, cache.age);
+		BUG_ON(ret & AGP_USER_ENCODED);
+		ret |= AGP_USER_ENCODED;
+		return ret;
+	}
+
+	switch (cache.level) {
 	case I915_CACHE_LLC_MLC:
-		if (INTEL_INFO(dev)->gen >= 6 && !IS_HASWELL(dev))
+		if (INTEL_INFO(dev)->gen >= 6)
 			return AGP_USER_CACHED_MEMORY_LLC_MLC;
 		/* Older chipsets do not have this extra level of CPU
 		 * cacheing, so fallthrough and request the PTE simply
@@ -393,7 +392,7 @@ void i915_gem_gtt_bind_object(struct drm_i915_gem_object *obj,
 			      struct drm_i915_cache_attributes cache)
 {
 	struct drm_device *dev = obj->base.dev;
-	unsigned int agp_type = cache_level_to_agp_type(dev, cache.level);
+	unsigned int agp_type = cache_level_to_agp_type(dev, cache);
 
 	intel_gtt_insert_sg_entries(obj->pages,
 				    obj->gtt_space->start >> PAGE_SHIFT,

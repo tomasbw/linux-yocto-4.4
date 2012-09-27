@@ -1159,7 +1159,9 @@ static void haswell_write_entry(dma_addr_t addr, unsigned int entry,
 {
 	u32 pte_flags;
 
-	if (flags == AGP_USER_MEMORY)
+	if (flags & AGP_USER_ENCODED)
+		pte_flags = flags &= ~AGP_USER_ENCODED;
+	else if (flags == AGP_USER_MEMORY)
 		pte_flags = HSW_PTE_UNCACHED | I810_PTE_VALID;
 	else
 		pte_flags = GEN6_PTE_LLC | I810_PTE_VALID;
