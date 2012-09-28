@@ -605,6 +605,7 @@ static void hsw_set_infoframes(struct drm_encoder *encoder,
 
 	intel_hdmi_set_avi_infoframe(encoder, adjusted_mode);
 	intel_hdmi_set_spd_infoframe(encoder);
+	intel_hdmi_set_hdmi_infoframe(encoder, adjusted_mode);
 }
 
 static void intel_hdmi_mode_set(struct drm_encoder *encoder,
