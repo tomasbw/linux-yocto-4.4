@@ -3274,6 +3274,11 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 	};
 	int ret;
 
+	if (I915_NEED_WT_DISPLAY(obj->base.dev)) {
+		cache.level = I915_CACHE_ELLC;
+		cache.policy = I915_CACHE_WT;
+	}
+
 	if (pipelined != obj->ring) {
 		ret = i915_gem_object_sync(obj, pipelined);
 		if (ret)

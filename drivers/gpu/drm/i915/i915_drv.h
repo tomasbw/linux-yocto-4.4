@@ -1178,6 +1178,10 @@ struct drm_i915_file_private {
 #define HAS_BLT(dev)            (INTEL_INFO(dev)->has_blt_ring)
 #define HAS_LLC(dev)            (INTEL_INFO(dev)->has_llc)
 #define HAS_ELLC(dev)		(((struct drm_i915_private *)(dev)->dev_private)->mutable_info.has_ellc)
+#define I915_NEED_WT_DISPLAY(dev) (((dev)->pci_device == 0x0d32) || \
+				  ((dev)->pci_device == 0x0d36) || \
+				  ((dev)->pci_device == 0x0d3a))
+
 #define I915_NEED_GFX_HWS(dev)	(INTEL_INFO(dev)->need_gfx_hws)
 
 #define HAS_HW_CONTEXTS(dev)	(INTEL_INFO(dev)->gen >= 6)
