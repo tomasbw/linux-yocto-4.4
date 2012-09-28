@@ -96,6 +96,8 @@ static const char *cache_level_str(int type)
 	case I915_CACHE_NONE: return " uncached";
 	case I915_CACHE_LLC: return " snooped (LLC)";
 	case I915_CACHE_LLC_MLC: return " snooped (LLC+MLC)";
+	case I915_CACHE_LLC_ELLC: return "ELLC backed LLC";
+	case I915_CACHE_ELLC: return "ELLC";
 	default: return "";
 	}
 }
