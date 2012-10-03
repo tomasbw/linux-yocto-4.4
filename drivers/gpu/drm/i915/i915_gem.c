@@ -3764,7 +3764,11 @@ struct drm_i915_gem_object *i915_gem_alloc_object(struct drm_device *dev,
 	obj->base.write_domain = I915_GEM_DOMAIN_CPU;
 	obj->base.read_domains = I915_GEM_DOMAIN_CPU;
 
-	if (HAS_LLC(dev)) {
+	if (HAS_ELLC(dev)) {
+		obj->cache.level = I915_CACHE_LLC_ELLC;
+		obj->cache.policy = I915_CACHE_WB;
+		obj->cache.age = 3;
+	} else if (HAS_LLC(dev)) {
 		/* On some devices, we can have the GPU use the LLC (the CPU
 		 * cache) for about a 10% performance improvement
 		 * compared to uncached.  Graphics requests other than
