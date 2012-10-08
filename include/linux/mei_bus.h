@@ -102,4 +102,7 @@ typedef void (*mei_bus_event_cb_t)(struct mei_bus_client *client,
 int mei_bus_register_event_cb(struct mei_bus_client *client,
 			      mei_bus_event_cb_t read_cb, void *context);
 
+void *mei_bus_get_clientdata(const struct mei_bus_client *client);
+void mei_bus_set_clientdata(struct mei_bus_client *client, void *data);
+
 #endif /* _LINUX_MEI_BUS_H */

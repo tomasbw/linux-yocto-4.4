@@ -448,6 +448,18 @@ int mei_bus_register_event_cb(struct mei_bus_client *client,
 }
 EXPORT_SYMBOL(mei_bus_register_event_cb);
 
+inline void *mei_bus_get_clientdata(const struct mei_bus_client *client)
+{
+	return dev_get_drvdata(&client->dev);
+}
+EXPORT_SYMBOL(mei_bus_get_clientdata);
+
+inline void mei_bus_set_clientdata(struct mei_bus_client *client, void *data)
+{
+	dev_set_drvdata(&client->dev, data);
+}
+EXPORT_SYMBOL(mei_bus_set_clientdata);
+
 void mei_bus_rx_event(struct mei_cl *cl)
 {
 	struct mei_bus_client *client = cl->client;
