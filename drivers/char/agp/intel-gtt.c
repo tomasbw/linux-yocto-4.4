@@ -667,12 +667,8 @@ static int intel_gtt_init(void)
 	gtt_map_size = intel_private.base.gtt_total_entries * 4;
 
 	intel_private.gtt = NULL;
-	if (INTEL_GTT_GEN < 6)
-		intel_private.gtt = ioremap_wc(intel_private.gtt_bus_addr,
-					       gtt_map_size);
-	if (intel_private.gtt == NULL)
-		intel_private.gtt = ioremap(intel_private.gtt_bus_addr,
-					    gtt_map_size);
+	intel_private.gtt = ioremap_wc(intel_private.gtt_bus_addr,
+				       gtt_map_size);
 	if (intel_private.gtt == NULL) {
 		intel_private.driver->cleanup();
 		iounmap(intel_private.registers);
@@ -897,6 +893,7 @@ void intel_gtt_insert_sg_entries(struct sg_table *st,
 		}
 	}
 	readl(intel_private.gtt+j-1);
+	writel(GFX_FLSH_CNTL_EN, intel_private.registers + GFX_FLSH_CNTL);
 }
 EXPORT_SYMBOL(intel_gtt_insert_sg_entries);
 
@@ -913,6 +910,7 @@ static void intel_gtt_insert_pages(unsigned int first_entry,
 						  j, flags);
 	}
 	readl(intel_private.gtt+j-1);
+	writel(GFX_FLSH_CNTL_EN, intel_private.registers + GFX_FLSH_CNTL);
 }
 
 static int intel_fake_agp_insert_entries(struct agp_memory *mem,
@@ -1249,7 +1247,7 @@ static int i9xx_setup(void)
 
 	reg_addr &= 0xfff80000;
 
-	if (INTEL_GTT_GEN >= 7)
+	if (INTEL_GTT_GEN >= 6)
 		size = MB(2);
 
 	intel_private.registers = ioremap(reg_addr, size);
