@@ -43,10 +43,6 @@ const char *mei_dev_state_str(int state)
 }
 
 
-const uuid_le mei_amthi_guid  = UUID_LE(0x12f80028, 0xb4b7, 0x4b2d, 0xac,
-						0xa8, 0x46, 0xe0, 0xff, 0x65,
-						0x81, 0x4c);
-
 /**
  * mei_io_list_flush - removes list entry belonging to cl.
  *
@@ -92,23 +88,6 @@ int mei_cl_flush_queues(struct mei_cl *cl)
 
 
 /**
- * mei_reset_iamthif_params - initializes mei device iamthif
- *
- * @dev: the device structure
- */
-static void mei_reset_iamthif_params(struct mei_device *dev)
-{
-	/* reset iamthif parameters. */
-	dev->iamthif_current_cb = NULL;
-	dev->iamthif_msg_buf_size = 0;
-	dev->iamthif_msg_buf_index = 0;
-	dev->iamthif_canceled = false;
-	dev->iamthif_ioctl = false;
-	dev->iamthif_state = MEI_IAMTHIF_IDLE;
-	dev->iamthif_timer = 0;
-}
-
-/**
  * init_mei_device - allocates and initializes the mei device structure
  *
  * @pdev: The pci device structure
@@ -132,8 +111,6 @@ struct mei_device *mei_device_init(struct pci_dev *pdev)
 	init_waitqueue_head(&dev->wait_stop_wd);
 	dev->dev_state = MEI_DEV_INITIALIZING;
 	dev->iamthif_state = MEI_IAMTHIF_IDLE;
-	dev->wd_interface_reg = false;
-
 
 	mei_io_list_init(&dev->read_list);
 	mei_io_list_init(&dev->write_list);
@@ -184,7 +161,8 @@ int mei_hw_init(struct mei_device *dev)
 	if (!dev->recvd_msg) {
 		mutex_unlock(&dev->device_lock);
 		err = wait_event_interruptible_timeout(dev->wait_recvd_msg,
-			dev->recvd_msg, MEI_INTEROP_TIMEOUT);
+			dev->recvd_msg,
+			mei_secs_to_jiffies(MEI_INTEROP_TIMEOUT));
 		mutex_lock(&dev->device_lock);
 	}
 
@@ -312,7 +290,7 @@ void mei_reset(struct mei_device *dev, int interrupts_enabled)
 		mei_remove_client_from_file_list(dev,
 				dev->iamthif_cl.host_client_id);
 
-		mei_reset_iamthif_params(dev);
+		mei_amthif_reset_params(dev);
 		dev->extra_write_index = 0;
 	}
 
@@ -381,7 +359,7 @@ void mei_host_start_message(struct mei_device *dev)
 		mei_reset(dev, 1);
 	}
 	dev->init_clients_state = MEI_START_MESSAGE;
-	dev->init_clients_timer = INIT_CLIENTS_TIMEOUT;
+	dev->init_clients_timer = MEI_CLIENTS_INIT_TIMEOUT;
 	return ;
 }
 
@@ -414,7 +392,7 @@ void mei_host_enum_clients_message(struct mei_device *dev)
 		mei_reset(dev, 1);
 	}
 	dev->init_clients_state = MEI_ENUM_CLIENTS_MESSAGE;
-	dev->init_clients_timer = INIT_CLIENTS_TIMEOUT;
+	dev->init_clients_timer = MEI_CLIENTS_INIT_TIMEOUT;
 	return;
 }
 
@@ -502,7 +480,7 @@ int mei_host_client_properties(struct mei_device *dev)
 			return -EIO;
 		}
 
-		dev->init_clients_timer = INIT_CLIENTS_TIMEOUT;
+		dev->init_clients_timer = MEI_CLIENTS_INIT_TIMEOUT;
 		dev->me_client_index = b;
 		return 1;
 	}
@@ -576,56 +554,6 @@ int mei_me_cl_update_filext(struct mei_device *dev, struct mei_cl *cl,
 }
 
 /**
- * host_init_iamthif - mei initialization iamthif client.
- *
- * @dev: the device structure
- *
- */
-void mei_host_init_iamthif(struct mei_device *dev)
-{
-	int i;
-	unsigned char *msg_buf;
-
-	mei_cl_init(&dev->iamthif_cl, dev);
-	dev->iamthif_cl.state = MEI_FILE_DISCONNECTED;
-
-	/* find ME amthi client */
-	i = mei_me_cl_update_filext(dev, &dev->iamthif_cl,
-			    &mei_amthi_guid, MEI_IAMTHIF_HOST_CLIENT_ID);
-	if (i < 0) {
-		dev_dbg(&dev->pdev->dev, "failed to find iamthif client.\n");
-		return;
-	}
-
-	/* Assign iamthif_mtu to the value received from ME  */
-
-	dev->iamthif_mtu = dev->me_clients[i].props.max_msg_length;
-	dev_dbg(&dev->pdev->dev, "IAMTHIF_MTU = %d\n",
-			dev->me_clients[i].props.max_msg_length);
-
-	kfree(dev->iamthif_msg_buf);
-	dev->iamthif_msg_buf = NULL;
-
-	/* allocate storage for ME message buffer */
-	msg_buf = kcalloc(dev->iamthif_mtu,
-			sizeof(unsigned char), GFP_KERNEL);
-	if (!msg_buf) {
-		dev_dbg(&dev->pdev->dev, "memory allocation for ME message buffer failed.\n");
-		return;
-	}
-
-	dev->iamthif_msg_buf = msg_buf;
-
-	if (mei_connect(dev, &dev->iamthif_cl)) {
-		dev_dbg(&dev->pdev->dev, "Failed to connect to AMTHI client\n");
-		dev->iamthif_cl.state = MEI_FILE_DISCONNECTED;
-		dev->iamthif_cl.host_client_id = 0;
-	} else {
-		dev->iamthif_cl.timer_count = CONNECT_TIMEOUT;
-	}
-}
-
-/**
  * mei_alloc_file_private - allocates a private file structure and sets it up.
  * @file: the file structure
  *
@@ -658,9 +586,8 @@ struct mei_cl *mei_cl_allocate(struct mei_device *dev)
  */
 int mei_disconnect_host_client(struct mei_device *dev, struct mei_cl *cl)
 {
-	int rets, err;
-	long timeout = 15;	/* 15 seconds */
 	struct mei_cl_cb *cb;
+	int rets, err;
 
 	if (!dev || !cl)
 		return -ENODEV;
@@ -690,8 +617,8 @@ int mei_disconnect_host_client(struct mei_device *dev, struct mei_cl *cl)
 	mutex_unlock(&dev->device_lock);
 
 	err = wait_event_timeout(dev->wait_recvd_msg,
-		 (MEI_FILE_DISCONNECTED == cl->state),
-		 timeout * HZ);
+			MEI_FILE_DISCONNECTED == cl->state,
+			mei_secs_to_jiffies(MEI_CL_CONNECT_TIMEOUT));
 
 	mutex_lock(&dev->device_lock);
 	if (MEI_FILE_DISCONNECTED == cl->state) {
