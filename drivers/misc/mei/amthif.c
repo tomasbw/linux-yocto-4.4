@@ -73,10 +73,10 @@ void mei_amthif_host_init(struct mei_device *dev)
 	dev->iamthif_cl.state = MEI_FILE_DISCONNECTED;
 
 	/* find ME amthi client */
-	i = mei_me_cl_update_filext(dev, &dev->iamthif_cl,
+	i = mei_me_cl_link(dev, &dev->iamthif_cl,
 			    &mei_amthi_guid, MEI_IAMTHIF_HOST_CLIENT_ID);
 	if (i < 0) {
-		dev_dbg(&dev->pdev->dev, "failed to find iamthif client.\n");
+		dev_info(&dev->pdev->dev, "failed to find iamthif client.\n");
 		return;
 	}
 
@@ -119,14 +119,12 @@ void mei_amthif_host_init(struct mei_device *dev)
 struct mei_cl_cb *mei_amthif_find_read_list_entry(struct mei_device *dev,
 						struct file *file)
 {
-	struct mei_cl *cl_temp;
 	struct mei_cl_cb *pos = NULL;
 	struct mei_cl_cb *next = NULL;
 
 	list_for_each_entry_safe(pos, next,
-	    &dev->amthi_read_complete_list.list, list) {
-		cl_temp = (struct mei_cl *)pos->file_private;
-		if (cl_temp && cl_temp == &dev->iamthif_cl &&
+				&dev->amthif_rd_complete_list.list, list) {
+		if (pos->cl && pos->cl == &dev->iamthif_cl &&
 			pos->file_object == file)
 			return pos;
 	}
@@ -349,14 +347,14 @@ int mei_amthif_write(struct mei_device *dev, struct mei_cl_cb *cb)
 	if (ret)
 		return ret;
 
-	cb->major_file_operations = MEI_IOCTL;
+	cb->fop_type = MEI_FOP_IOCTL;
 
-	if (!list_empty(&dev->amthi_cmd_list.list) ||
+	if (!list_empty(&dev->amthif_cmd_list.list) ||
 	    dev->iamthif_state != MEI_IAMTHIF_IDLE) {
 		dev_dbg(&dev->pdev->dev,
 			"amthif state = %d\n", dev->iamthif_state);
 		dev_dbg(&dev->pdev->dev, "AMTHIF: add cb to the wait list\n");
-		list_add_tail(&cb->list, &dev->amthi_cmd_list.list);
+		list_add_tail(&cb->list, &dev->amthif_cmd_list.list);
 		return 0;
 	}
 	return mei_amthif_send_cmd(dev, cb);
@@ -370,7 +368,6 @@ int mei_amthif_write(struct mei_device *dev, struct mei_cl_cb *cb)
  */
 void mei_amthif_run_next_cmd(struct mei_device *dev)
 {
-	struct mei_cl *cl_tmp;
 	struct mei_cl_cb *pos = NULL;
 	struct mei_cl_cb *next = NULL;
 	int status;
@@ -388,11 +385,10 @@ void mei_amthif_run_next_cmd(struct mei_device *dev)
 
 	dev_dbg(&dev->pdev->dev, "complete amthi cmd_list cb.\n");
 
-	list_for_each_entry_safe(pos, next, &dev->amthi_cmd_list.list, list) {
+	list_for_each_entry_safe(pos, next, &dev->amthif_cmd_list.list, list) {
 		list_del(&pos->list);
-		cl_tmp = (struct mei_cl *)pos->file_private;
 
-		if (cl_tmp && cl_tmp == &dev->iamthif_cl) {
+		if (pos->cl && pos->cl == &dev->iamthif_cl) {
 			status = mei_amthif_send_cmd(dev, pos);
 			if (status) {
 				dev_dbg(&dev->pdev->dev,
@@ -404,6 +400,25 @@ void mei_amthif_run_next_cmd(struct mei_device *dev)
 		}
 	}
 }
+
+
+unsigned int mei_amthif_poll(struct mei_device *dev,
+		struct file *file, poll_table *wait)
+{
+	unsigned int mask = 0;
+	mutex_unlock(&dev->device_lock);
+	poll_wait(file, &dev->iamthif_cl.wait, wait);
+	mutex_lock(&dev->device_lock);
+	if (dev->iamthif_state == MEI_IAMTHIF_READ_COMPLETE &&
+		dev->iamthif_file_object == file) {
+		mask |= (POLLIN | POLLRDNORM);
+		dev_dbg(&dev->pdev->dev, "run next amthi cb\n");
+		mei_amthif_run_next_cmd(dev);
+	}
+	return mask;
+}
+
+
 
 /**
  * mei_amthif_irq_process_completed - processes completed iamthif operation.
@@ -500,7 +515,6 @@ int mei_amthif_irq_process_completed(struct mei_device *dev, s32 *slots,
 int mei_amthif_irq_read_message(struct mei_cl_cb *complete_list,
 		struct mei_device *dev, struct mei_msg_hdr *mei_hdr)
 {
-	struct mei_cl *cl;
 	struct mei_cl_cb *cb;
 	unsigned char *buffer;
 
@@ -528,14 +542,13 @@ int mei_amthif_irq_read_message(struct mei_cl_cb *complete_list,
 	cb = dev->iamthif_current_cb;
 	dev->iamthif_current_cb = NULL;
 
-	cl = (struct mei_cl *)cb->file_private;
-	if (!cl)
+	if (!cb->cl)
 		return -ENODEV;
 
 	dev->iamthif_stall_timer = 0;
 	cb->buf_idx = dev->iamthif_msg_buf_index;
 	cb->read_time = jiffies;
-	if (dev->iamthif_ioctl && cl == &dev->iamthif_cl) {
+	if (dev->iamthif_ioctl && cb->cl == &dev->iamthif_cl) {
 		/* found the iamthif cb */
 		dev_dbg(&dev->pdev->dev, "complete the amthi read cb.\n ");
 		dev_dbg(&dev->pdev->dev, "add the amthi read cb to complete.\n ");
@@ -589,7 +602,7 @@ void mei_amthif_complete(struct mei_device *dev, struct mei_cl_cb *cb)
 		memcpy(cb->response_buffer.data,
 				dev->iamthif_msg_buf,
 				dev->iamthif_msg_buf_index);
-		list_add_tail(&cb->list, &dev->amthi_read_complete_list.list);
+		list_add_tail(&cb->list, &dev->amthif_rd_complete_list.list);
 		dev_dbg(&dev->pdev->dev, "amthi read completed\n");
 		dev->iamthif_timer = jiffies;
 		dev_dbg(&dev->pdev->dev, "dev->iamthif_timer = %ld\n",
@@ -602,4 +615,118 @@ void mei_amthif_complete(struct mei_device *dev, struct mei_cl_cb *cb)
 	wake_up_interruptible(&dev->iamthif_cl.wait);
 }
 
+/**
+ * mei_clear_list - removes all callbacks associated with file
+ *		from mei_cb_list
+ *
+ * @dev: device structure.
+ * @file: file structure
+ * @mei_cb_list: callbacks list
+ *
+ * mei_clear_list is called to clear resources associated with file
+ * when application calls close function or Ctrl-C was pressed
+ *
+ * returns true if callback removed from the list, false otherwise
+ */
+static bool mei_clear_list(struct mei_device *dev,
+		const struct file *file, struct list_head *mei_cb_list)
+{
+	struct mei_cl_cb *cb_pos = NULL;
+	struct mei_cl_cb *cb_next = NULL;
+	bool removed = false;
 
+	/* list all list member */
+	list_for_each_entry_safe(cb_pos, cb_next, mei_cb_list, list) {
+		/* check if list member associated with a file */
+		if (file == cb_pos->file_object) {
+			/* remove member from the list */
+			list_del(&cb_pos->list);
+			/* check if cb equal to current iamthif cb */
+			if (dev->iamthif_current_cb == cb_pos) {
+				dev->iamthif_current_cb = NULL;
+				/* send flow control to iamthif client */
+				mei_send_flow_control(dev, &dev->iamthif_cl);
+			}
+			/* free all allocated buffers */
+			mei_io_cb_free(cb_pos);
+			cb_pos = NULL;
+			removed = true;
+		}
+	}
+	return removed;
+}
+
+/**
+ * mei_clear_lists - removes all callbacks associated with file
+ *
+ * @dev: device structure
+ * @file: file structure
+ *
+ * mei_clear_lists is called to clear resources associated with file
+ * when application calls close function or Ctrl-C was pressed
+ *
+ * returns true if callback removed from the list, false otherwise
+ */
+static bool mei_clear_lists(struct mei_device *dev, struct file *file)
+{
+	bool removed = false;
+
+	/* remove callbacks associated with a file */
+	mei_clear_list(dev, file, &dev->amthif_cmd_list.list);
+	if (mei_clear_list(dev, file, &dev->amthif_rd_complete_list.list))
+		removed = true;
+
+	mei_clear_list(dev, file, &dev->ctrl_rd_list.list);
+
+	if (mei_clear_list(dev, file, &dev->ctrl_wr_list.list))
+		removed = true;
+
+	if (mei_clear_list(dev, file, &dev->write_waiting_list.list))
+		removed = true;
+
+	if (mei_clear_list(dev, file, &dev->write_list.list))
+		removed = true;
+
+	/* check if iamthif_current_cb not NULL */
+	if (dev->iamthif_current_cb && !removed) {
+		/* check file and iamthif current cb association */
+		if (dev->iamthif_current_cb->file_object == file) {
+			/* remove cb */
+			mei_io_cb_free(dev->iamthif_current_cb);
+			dev->iamthif_current_cb = NULL;
+			removed = true;
+		}
+	}
+	return removed;
+}
+
+/**
+* mei_amthif_release - the release function
+*
+*  @inode: pointer to inode structure
+*  @file: pointer to file structure
+*
+*  returns 0 on success, <0 on error
+*/
+int mei_amthif_release(struct mei_device *dev, struct file *file)
+{
+	if (dev->open_handle_count > 0)
+		dev->open_handle_count--;
+
+	if (dev->iamthif_file_object == file &&
+	    dev->iamthif_state != MEI_IAMTHIF_IDLE) {
+
+		dev_dbg(&dev->pdev->dev, "amthi canceled iamthif state %d\n",
+		    dev->iamthif_state);
+		dev->iamthif_canceled = true;
+		if (dev->iamthif_state == MEI_IAMTHIF_READ_COMPLETE) {
+			dev_dbg(&dev->pdev->dev, "run next amthi iamthif cb\n");
+			mei_amthif_run_next_cmd(dev);
+		}
+	}
+
+	if (mei_clear_lists(dev, file))
+		dev->iamthif_state = MEI_IAMTHIF_IDLE;
+
+	return 0;
+}

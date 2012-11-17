@@ -55,10 +55,8 @@ void mei_io_list_flush(struct mei_cl_cb *list, struct mei_cl *cl)
 	struct mei_cl_cb *next;
 
 	list_for_each_entry_safe(pos, next, &list->list, list) {
-		if (pos->file_private) {
-			struct mei_cl *cl_tmp;
-			cl_tmp = (struct mei_cl *)pos->file_private;
-			if (mei_cl_cmp_id(cl, cl_tmp))
+		if (pos->cl) {
+			if (mei_cl_cmp_id(cl, pos->cl))
 				list_del(&pos->list);
 		}
 	}
@@ -80,8 +78,8 @@ int mei_cl_flush_queues(struct mei_cl *cl)
 	mei_io_list_flush(&cl->dev->write_waiting_list, cl);
 	mei_io_list_flush(&cl->dev->ctrl_wr_list, cl);
 	mei_io_list_flush(&cl->dev->ctrl_rd_list, cl);
-	mei_io_list_flush(&cl->dev->amthi_cmd_list, cl);
-	mei_io_list_flush(&cl->dev->amthi_read_complete_list, cl);
+	mei_io_list_flush(&cl->dev->amthif_cmd_list, cl);
+	mei_io_list_flush(&cl->dev->amthif_rd_complete_list, cl);
 	return 0;
 }
 
@@ -117,8 +115,8 @@ struct mei_device *mei_device_init(struct pci_dev *pdev)
 	mei_io_list_init(&dev->write_waiting_list);
 	mei_io_list_init(&dev->ctrl_wr_list);
 	mei_io_list_init(&dev->ctrl_rd_list);
-	mei_io_list_init(&dev->amthi_cmd_list);
-	mei_io_list_init(&dev->amthi_read_complete_list);
+	mei_io_list_init(&dev->amthif_cmd_list);
+	mei_io_list_init(&dev->amthif_rd_complete_list);
 	dev->pdev = pdev;
 	return dev;
 }
@@ -283,12 +281,10 @@ void mei_reset(struct mei_device *dev, int interrupts_enabled)
 			cl_pos->timer_count = 0;
 		}
 		/* remove entry if already in list */
-		dev_dbg(&dev->pdev->dev, "list del iamthif and wd file list.\n");
-		mei_remove_client_from_file_list(dev,
-				dev->wd_cl.host_client_id);
+		dev_dbg(&dev->pdev->dev, "remove iamthif and wd from the file list.\n");
+		mei_me_cl_unlink(dev, &dev->wd_cl);
 
-		mei_remove_client_from_file_list(dev,
-				dev->iamthif_cl.host_client_id);
+		mei_me_cl_unlink(dev, &dev->iamthif_cl);
 
 		mei_amthif_reset_params(dev);
 		dev->extra_write_index = 0;
@@ -522,17 +518,20 @@ int mei_me_cl_by_uuid(const struct mei_device *dev, const uuid_le *cuuid)
 
 
 /**
- * mei_me_cl_update_filext - searches for ME client guid
- *                       sets client_id in mei_file_private if found
- * @dev: the device structure
- * @cl: private file structure to set client_id in
- * @cuuid: searched uuid of ME client
- * @client_id: id of host client to be set in file private structure
+ * mei_me_cl_link - create link between host and me clinet and add
+ *   me_cl to the list
  *
- * returns ME client index
+ * @dev: the device structure
+ * @cl: link between me and host client assocated with opened file descriptor
+ * @cuuid: uuid of ME client
+ * @client_id: id of the host client
+ *
+ * returns ME client index if ME client
+ *	-EINVAL on incorrect values
+ *	-ENONET if client not found
  */
-int mei_me_cl_update_filext(struct mei_device *dev, struct mei_cl *cl,
-				const uuid_le *cuuid, u8 host_cl_id)
+int mei_me_cl_link(struct mei_device *dev, struct mei_cl *cl,
+			const uuid_le *cuuid, u8 host_cl_id)
 {
 	int i;
 
@@ -551,6 +550,24 @@ int mei_me_cl_update_filext(struct mei_device *dev, struct mei_cl *cl,
 	}
 
 	return -ENOENT;
+}
+/**
+ * mei_me_cl_unlink - remove me_cl from the list
+ *
+ * @dev: the device structure
+ * @host_client_id: host client id to be removed
+ */
+void mei_me_cl_unlink(struct mei_device *dev, struct mei_cl *cl)
+{
+	struct mei_cl *pos, *next;
+	list_for_each_entry_safe(pos, next, &dev->file_list, link) {
+		if (cl->host_client_id == pos->host_client_id) {
+			dev_dbg(&dev->pdev->dev, "remove host client = %d, ME client = %d\n",
+					pos->host_client_id, pos->me_client_id);
+			list_del_init(&pos->link);
+			break;
+		}
+	}
 }
 
 /**
@@ -599,7 +616,7 @@ int mei_disconnect_host_client(struct mei_device *dev, struct mei_cl *cl)
 	if (!cb)
 		return -ENOMEM;
 
-	cb->major_file_operations = MEI_CLOSE;
+	cb->fop_type = MEI_FOP_CLOSE;
 	if (dev->mei_host_buffer_is_empty) {
 		dev->mei_host_buffer_is_empty = false;
 		if (mei_disconnect(dev, cl)) {
@@ -644,25 +661,3 @@ free:
 	return rets;
 }
 
-/**
- * mei_remove_client_from_file_list -
- *	removes file private data from device file list
- *
- * @dev: the device structure
- * @host_client_id: host client id to be removed
- */
-void mei_remove_client_from_file_list(struct mei_device *dev,
-				       u8 host_client_id)
-{
-	struct mei_cl *cl_pos = NULL;
-	struct mei_cl *cl_next = NULL;
-	list_for_each_entry_safe(cl_pos, cl_next, &dev->file_list, link) {
-		if (host_client_id == cl_pos->host_client_id) {
-			dev_dbg(&dev->pdev->dev, "remove host client = %d, ME client = %d\n",
-					cl_pos->host_client_id,
-					cl_pos->me_client_id);
-			list_del_init(&cl_pos->link);
-			break;
-		}
-	}
-}

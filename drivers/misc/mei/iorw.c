@@ -71,7 +71,7 @@ struct mei_cl_cb *mei_io_cb_init(struct mei_cl *cl, struct file *fp)
 	mei_io_list_init(cb);
 
 	cb->file_object = fp;
-	cb->file_private = cl;
+	cb->cl = cl;
 	cb->buf_idx = 0;
 	return cb;
 }
@@ -171,8 +171,6 @@ int mei_ioctl_connect_client(struct file *file,
 	struct mei_cl_cb *cb;
 	struct mei_client *client;
 	struct mei_cl *cl;
-	struct mei_cl *cl_pos = NULL;
-	struct mei_cl *cl_next = NULL;
 	long timeout = mei_secs_to_jiffies(MEI_CL_CONNECT_TIMEOUT);
 	int i;
 	int err;
@@ -193,7 +191,7 @@ int mei_ioctl_connect_client(struct file *file,
 		goto end;
 	}
 
-	cb->major_file_operations = MEI_IOCTL;
+	cb->fop_type = MEI_FOP_IOCTL;
 
 	if (dev->dev_state != MEI_DEV_ENABLED) {
 		rets = -ENODEV;
@@ -229,21 +227,9 @@ int mei_ioctl_connect_client(struct file *file,
 			goto end;
 		}
 		clear_bit(cl->host_client_id, dev->host_clients_map);
-		list_for_each_entry_safe(cl_pos, cl_next,
-					 &dev->file_list, link) {
-			if (mei_cl_cmp_id(cl, cl_pos)) {
-				dev_dbg(&dev->pdev->dev,
-					"remove file private data node host"
-				    " client = %d, ME client = %d.\n",
-				    cl_pos->host_client_id,
-				    cl_pos->me_client_id);
-				list_del(&cl_pos->link);
-			}
+		mei_me_cl_unlink(dev, cl);
 
-		}
-		dev_dbg(&dev->pdev->dev, "free file private data memory.\n");
 		kfree(cl);
-
 		cl = NULL;
 		file->private_data = &dev->iamthif_cl;
 
@@ -360,7 +346,7 @@ int mei_start_read(struct mei_device *dev, struct mei_cl *cl)
 	if (rets)
 		goto err;
 
-	cb->major_file_operations = MEI_READ;
+	cb->fop_type = MEI_FOP_READ;
 	cl->read_cb = cb;
 	if (dev->mei_host_buffer_is_empty) {
 		dev->mei_host_buffer_is_empty = false;

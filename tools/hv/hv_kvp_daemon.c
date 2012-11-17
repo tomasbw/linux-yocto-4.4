@@ -299,7 +299,7 @@ static int kvp_file_init(void)
 	return 0;
 }
 
-static int kvp_key_delete(int pool, __u8 *key, int key_size)
+static int kvp_key_delete(int pool, const char *key, int key_size)
 {
 	int i;
 	int j, k;
@@ -342,7 +342,7 @@ static int kvp_key_delete(int pool, __u8 *key, int key_size)
 	return 1;
 }
 
-static int kvp_key_add_or_modify(int pool, __u8 *key, int key_size, __u8 *value,
+static int kvp_key_add_or_modify(int pool, const char *key, int key_size, const char *value,
 			int value_size)
 {
 	int i;
@@ -396,7 +396,7 @@ static int kvp_key_add_or_modify(int pool, __u8 *key, int key_size, __u8 *value,
 	return 0;
 }
 
-static int kvp_get_value(int pool, __u8 *key, int key_size, __u8 *value,
+static int kvp_get_value(int pool, const char *key, int key_size, char *value,
 			int value_size)
 {
 	int i;
@@ -428,8 +428,8 @@ static int kvp_get_value(int pool, __u8 *key, int key_size, __u8 *value,
 	return 1;
 }
 
-static int kvp_pool_enumerate(int pool, int index, __u8 *key, int key_size,
-				__u8 *value, int value_size)
+static int kvp_pool_enumerate(int pool, int index, char *key, int key_size,
+				char *value, int value_size)
 {
 	struct kvp_record *record;
 
@@ -1486,11 +1486,17 @@ int main(void)
 		len = recvfrom(fd, kvp_recv_buffer, sizeof(kvp_recv_buffer), 0,
 				addr_p, &addr_l);
 
-		if (len < 0 || addr.nl_pid) {
+		if (len < 0) {
 			syslog(LOG_ERR, "recvfrom failed; pid:%u error:%d %s",
 					addr.nl_pid, errno, strerror(errno));
 			close(fd);
 			return -1;
+		}
+
+		if (addr.nl_pid) {
+			syslog(LOG_WARNING, "Received packet from untrusted pid:%u",
+					addr.nl_pid);
+			continue;
 		}
 
 		incoming_msg = (struct nlmsghdr *)kvp_recv_buffer;

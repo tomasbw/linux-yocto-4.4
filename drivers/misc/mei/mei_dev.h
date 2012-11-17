@@ -19,6 +19,7 @@
 
 #include <linux/types.h>
 #include <linux/watchdog.h>
+#include <linux/poll.h>
 #include <linux/mei.h>
 #include "hw.h"
 
@@ -125,13 +126,20 @@ enum mei_wd_states {
 	MEI_WD_STOPPING,
 };
 
-/* MEI CB */
-enum mei_cb_major_types {
-	MEI_READ = 0,
-	MEI_WRITE,
-	MEI_IOCTL,
-	MEI_OPEN,
-	MEI_CLOSE
+/**
+ * enum mei_cb_file_ops  - file operation associated with the callback
+ * @MEI_FOP_READ   - read
+ * @MEI_FOP_WRITE  - write
+ * @MEI_FOP_IOCTL  - ioctl
+ * @MEI_FOP_OPEN   - open
+ * @MEI_FOP_CLOSE  - close
+ */
+enum mei_cb_file_ops {
+	MEI_FOP_READ = 0,
+	MEI_FOP_WRITE,
+	MEI_FOP_IOCTL,
+	MEI_FOP_OPEN,
+	MEI_FOP_CLOSE
 };
 
 /*
@@ -143,10 +151,18 @@ struct mei_message_data {
 };
 
 
+struct mei_cl;
+
+/**
+ * struct mei_cl_cb - file operation callback structure
+ *
+ * @cl - file client who is running this operation
+ * @fop_type - file operation type
+ */
 struct mei_cl_cb {
 	struct list_head list;
-	enum mei_cb_major_types major_file_operations;
-	void *file_private;
+	struct mei_cl *cl;
+	enum mei_cb_file_ops fop_type;
 	struct mei_message_data request_buffer;
 	struct mei_message_data response_buffer;
 	unsigned long buf_idx;
@@ -184,16 +200,13 @@ struct mei_device {
 	/*
 	 * lists of queues
 	 */
-	 /* array of pointers to aio lists */
+	/* array of pointers to aio lists */
 	struct mei_cl_cb read_list;		/* driver read queue */
 	struct mei_cl_cb write_list;		/* driver write queue */
 	struct mei_cl_cb write_waiting_list;	/* write waiting queue */
 	struct mei_cl_cb ctrl_wr_list;		/* managed write IOCTL list */
 	struct mei_cl_cb ctrl_rd_list;		/* managed read IOCTL list */
-	struct mei_cl_cb amthi_cmd_list;	/* amthi list for cmd waiting */
 
-	/* driver managed amthi list for reading completed amthi cmd data */
-	struct mei_cl_cb amthi_read_complete_list;
 	/*
 	 * list of files
 	 */
@@ -254,6 +267,10 @@ struct mei_device {
 	unsigned char wd_data[MEI_WD_START_MSG_SIZE];
 
 
+	/* amthif list for cmd waiting */
+	struct mei_cl_cb amthif_cmd_list;
+	/* driver managed amthif list for reading completed amthif cmd data */
+	struct mei_cl_cb amthif_rd_complete_list;
 	struct file *iamthif_file_object;
 	struct mei_cl iamthif_cl;
 	struct mei_cl_cb *iamthif_current_cb;
@@ -284,12 +301,12 @@ int mei_hw_init(struct mei_device *dev);
 int mei_task_initialize_clients(void *data);
 int mei_initialize_clients(struct mei_device *dev);
 int mei_disconnect_host_client(struct mei_device *dev, struct mei_cl *cl);
-void mei_remove_client_from_file_list(struct mei_device *dev, u8 host_client_id);
 void mei_allocate_me_clients_storage(struct mei_device *dev);
 
 
-int mei_me_cl_update_filext(struct mei_device *dev, struct mei_cl *cl,
+int mei_me_cl_link(struct mei_device *dev, struct mei_cl *cl,
 			const uuid_le *cguid, u8 host_client_id);
+void mei_me_cl_unlink(struct mei_device *dev, struct mei_cl *cl);
 int mei_me_cl_by_uuid(const struct mei_device *dev, const uuid_le *cuuid);
 int mei_me_cl_by_id(struct mei_device *dev, u8 client_id);
 
@@ -371,7 +388,12 @@ void mei_amthif_host_init(struct mei_device *dev);
 int mei_amthif_write(struct mei_device *dev, struct mei_cl_cb *priv_cb);
 
 int mei_amthif_read(struct mei_device *dev, struct file *file,
-	      char __user *ubuf, size_t length, loff_t *offset);
+		char __user *ubuf, size_t length, loff_t *offset);
+
+unsigned int mei_amthif_poll(struct mei_device *dev,
+		struct file *file, poll_table *wait);
+
+int mei_amthif_release(struct mei_device *dev, struct file *file);
 
 struct mei_cl_cb *mei_amthif_find_read_list_entry(struct mei_device *dev,
 						struct file *file);
