@@ -743,7 +743,7 @@ static struct miscdevice  mei_misc_device = {
  *
  * returns true if ME Interface is valid, false otherwise
  */
-static bool __devinit mei_quirk_probe(struct pci_dev *pdev,
+static bool mei_quirk_probe(struct pci_dev *pdev,
 				const struct pci_device_id *ent)
 {
 	u32 reg;
@@ -765,7 +765,7 @@ static bool __devinit mei_quirk_probe(struct pci_dev *pdev,
  *
  * returns 0 on success, <0 on failure.
  */
-static int __devinit mei_probe(struct pci_dev *pdev,
+static int mei_probe(struct pci_dev *pdev,
 				const struct pci_device_id *ent)
 {
 	struct mei_device *dev;
@@ -882,7 +882,7 @@ end:
  * mei_remove is called by the PCI subsystem to alert the driver
  * that it should release a PCI device.
  */
-static void __devexit mei_remove(struct pci_dev *pdev)
+static void mei_remove(struct pci_dev *pdev)
 {
 	struct mei_device *dev;
 
@@ -1023,8 +1023,8 @@ static struct pci_driver mei_driver = {
 	.name = KBUILD_MODNAME,
 	.id_table = mei_pci_tbl,
 	.probe = mei_probe,
-	.remove = __devexit_p(mei_remove),
-	.shutdown = __devexit_p(mei_remove),
+	.remove = mei_remove,
+	.shutdown = mei_remove,
 	.driver.pm = MEI_PM_OPS,
 };
 

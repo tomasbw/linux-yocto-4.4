@@ -29,6 +29,7 @@
 #include <linux/of_address.h>
 
 #define DRIVER_NAME "uio_dmem_genirq"
+#define DMEM_MAP_ERROR (~0)
 
 struct uio_dmem_genirq_platdata {
 	struct uio_info *uioinfo;
@@ -37,6 +38,7 @@ struct uio_dmem_genirq_platdata {
 	struct platform_device *pdev;
 	unsigned int dmem_region_start;
 	unsigned int num_dmem_regions;
+	void *dmem_region_vaddr[MAX_UIO_MAPS];
 	struct mutex alloc_lock;
 	unsigned int refcnt;
 };
@@ -46,6 +48,7 @@ static int uio_dmem_genirq_open(struct uio_info *info, struct inode *inode)
 	struct uio_dmem_genirq_platdata *priv = info->priv;
 	struct uio_mem *uiomem;
 	int ret = 0;
+	int dmem_region = priv->dmem_region_start;
 
 	uiomem = &priv->uioinfo->mem[priv->dmem_region_start];
 
@@ -58,11 +61,9 @@ static int uio_dmem_genirq_open(struct uio_info *info, struct inode *inode)
 		addr = dma_alloc_coherent(&priv->pdev->dev, uiomem->size,
 				(dma_addr_t *)&uiomem->addr, GFP_KERNEL);
 		if (!addr) {
-			ret = -ENOMEM;
-			break;
+			uiomem->addr = DMEM_MAP_ERROR;
 		}
-
-		uiomem->internal_addr = addr;
+		priv->dmem_region_vaddr[dmem_region++] = addr;
 		++uiomem;
 	}
 	priv->refcnt++;
@@ -77,6 +78,7 @@ static int uio_dmem_genirq_release(struct uio_info *info, struct inode *inode)
 {
 	struct uio_dmem_genirq_platdata *priv = info->priv;
 	struct uio_mem *uiomem;
+	int dmem_region = priv->dmem_region_start;
 
 	/* Tell the Runtime PM code that the device has become idle */
 	pm_runtime_put_sync(&priv->pdev->dev);
@@ -89,10 +91,13 @@ static int uio_dmem_genirq_release(struct uio_info *info, struct inode *inode)
 	while (!priv->refcnt && uiomem < &priv->uioinfo->mem[MAX_UIO_MAPS]) {
 		if (!uiomem->size)
 			break;
-
-		dma_free_coherent(&priv->pdev->dev, uiomem->size,
-				uiomem->internal_addr, uiomem->addr);
-		uiomem->addr = DMA_ERROR_CODE;
+		if (priv->dmem_region_vaddr[dmem_region]) {
+			dma_free_coherent(&priv->pdev->dev, uiomem->size,
+					priv->dmem_region_vaddr[dmem_region],
+					uiomem->addr);
+		}
+		uiomem->addr = DMEM_MAP_ERROR;
+		++dmem_region;
 		++uiomem;
 	}
 
@@ -148,7 +153,7 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
 	int ret = -EINVAL;
 	int i;
 
-	if (!uioinfo) {
+	if (pdev->dev.of_node) {
 		int irq;
 
 		/* alloc uioinfo for one device */
@@ -235,7 +240,7 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
 			break;
 		}
 		uiomem->memtype = UIO_MEM_PHYS;
-		uiomem->addr = DMA_ERROR_CODE;
+		uiomem->addr = DMEM_MAP_ERROR;
 		uiomem->size = pdata->dynamic_region_sizes[i];
 		++uiomem;
 	}
