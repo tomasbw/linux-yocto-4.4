@@ -438,7 +438,7 @@ int mei_amthif_irq_read(struct mei_device *dev, s32 *slots);
 static inline u32 mei_reg_read(const struct mei_device *dev,
 			       unsigned long offset)
 {
-	return ioread32(dev->mem_addr + offset);
+	return readl(dev->mem_addr + offset);
 }
 
 /**
@@ -451,7 +451,7 @@ static inline u32 mei_reg_read(const struct mei_device *dev,
 static inline void mei_reg_write(const struct mei_device *dev,
 				 unsigned long offset, u32 value)
 {
-	iowrite32(value, dev->mem_addr + offset);
+	writel(value, dev->mem_addr + offset);
 }
 
 /**
