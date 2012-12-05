@@ -264,6 +264,13 @@ struct mei_hw_ops {
 		     unsigned char *buf, unsigned long len);
 };
 
+struct mei_bus_client;
+
+struct mei_bus_ops {
+	int (*send)(struct mei_bus_client *client, u8 *buf, size_t length);
+	int (*recv)(struct mei_bus_client *client, u8 *buf, size_t length);
+};
+
 /**
  * mei_bus_client
  *
@@ -283,6 +290,13 @@ struct mei_bus_client {
 	struct mei_cl *cl;
 	struct mei_bus_driver *driver;
 	struct device dev;
+
+	struct mei_bus_ops *ops;
+
+	struct work_struct event_work;
+	mei_bus_event_cb_t event_cb;
+	void *event_context;
+	unsigned long events;
 
 	void *priv_data;
 };

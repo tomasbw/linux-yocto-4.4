@@ -88,7 +88,18 @@ struct mei_bus_driver {
 	int (*remove)(struct mei_bus_client *client);
 };
 
+#define MEI_BUS_EVENT_RX 0
+#define MEI_BUS_EVENT_TX 1
+
 int mei_add_driver(struct mei_bus_driver *driver);
 void mei_del_driver(struct mei_bus_driver *driver);
+
+int mei_bus_send(struct mei_bus_client *client, u8 *buf, size_t length);
+int mei_bus_recv(struct mei_bus_client *client, u8 *buf, size_t length);
+
+typedef void (*mei_bus_event_cb_t)(struct mei_bus_client *client,
+				   u32 events, void *context);
+int mei_bus_register_event_cb(struct mei_bus_client *client,
+			      mei_bus_event_cb_t read_cb, void *context);
 
 #endif /* _LINUX_MEI_BUS_H */
