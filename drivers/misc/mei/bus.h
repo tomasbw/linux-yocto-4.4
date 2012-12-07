@@ -24,7 +24,9 @@ struct mei_bus_client *mei_add_device(struct mei_device *mei_dev,
 					uuid_le uuid, char *name);
 void mei_remove_device(struct mei_bus_client *client);
 
+int mei_async_send(struct mei_cl *cl, u8 *buf, size_t length);
 int mei_send(struct mei_cl *cl, u8 *buf, size_t length);
 int mei_recv(struct mei_cl *cl, u8 *buf, size_t length);
+
 
 #endif /* _MEI_BUS_H_ */
