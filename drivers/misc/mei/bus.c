@@ -119,15 +119,36 @@ static struct device_type mei_client_type = {
 	.release	= mei_client_dev_release,
 };
 
+static struct mei_cl *mei_bus_find_mei_cl_by_uuid(struct mei_device *mei_dev,
+						uuid_le uuid)
+{
+	struct mei_cl *cl, *next;
+
+	list_for_each_entry_safe(cl, next,
+				 &mei_dev->bus_client_list, bus_client_link) {
+		if (!uuid_le_cmp(uuid, cl->bus_client_uuid))
+			return cl;
+	}
+
+	return NULL;
+}
+
 struct mei_bus_client *mei_add_device(struct mei_device *mei_dev,
 				      uuid_le uuid, char *name)
 {
 	struct mei_bus_client *client;
+	struct mei_cl *cl;
 	int status;
+
+	cl = mei_bus_find_mei_cl_by_uuid(mei_dev, uuid);
+	if (cl == NULL)
+		return NULL;
 
 	client = kzalloc(sizeof(struct mei_bus_client), GFP_KERNEL);
 	if (!client)
 		return NULL;
+
+	client->cl = cl;
 
 	client->mei_dev = mei_dev;
 	client->uuid = uuid;
@@ -140,19 +161,17 @@ struct mei_bus_client *mei_add_device(struct mei_device *mei_dev,
 	dev_set_name(&client->dev, "%s", client->name);
 
 	status = device_register(&client->dev);
-	if (status)
-		goto out_err;
+	if (status) {
+		kfree(client);
+		dev_err(client->dev.parent, "Failed to register MEI client\n");
+		return NULL;
+	}
+
+	cl->client = client;
 
 	dev_dbg(&client->dev, "client %s registered\n", client->name);
 
 	return client;
-
-out_err:
-	dev_err(client->dev.parent, "Failed to register MEI client\n");
-
-	kfree(client);
-
-	return NULL;
 }
 EXPORT_SYMBOL(mei_add_device);
 
@@ -353,9 +372,10 @@ out:
 
 int mei_bus_send(struct mei_bus_client *client, u8 *buf, size_t length)
 {
-	struct mei_cl *cl = NULL;
+	struct mei_cl *cl = client->cl;
 
-	/* TODO: hook between mei_bus_client and mei_cl */
+	if (cl == NULL)
+		return -ENODEV;
 
 	if (client->ops && client->ops->send)
 		return client->ops->send(client, buf, length);
@@ -366,9 +386,10 @@ EXPORT_SYMBOL(mei_bus_send);
 
 int mei_bus_recv(struct mei_bus_client *client, u8 *buf, size_t length)
 {
-	struct mei_cl *cl = NULL;
+	struct mei_cl *cl =  client->cl;
 
-	/* TODO: hook between mei_bus_client and mei_cl */
+	if (cl == NULL)
+		return -ENODEV;
 
 	if (client->ops && client->ops->recv)
 		return client->ops->recv(client, buf, length);
