@@ -153,3 +153,32 @@ void mei_remove_device(struct mei_bus_client *client)
 	device_unregister(&client->dev);
 }
 EXPORT_SYMBOL(mei_remove_device);
+
+int mei_add_driver(struct mei_bus_driver *driver)
+{
+	int err;
+
+	/* Can't register until after driver model init */
+	if (unlikely(WARN_ON(!mei_bus_type.p)))
+		return -EAGAIN;
+
+	driver->driver.owner = THIS_MODULE;
+	driver->driver.bus = &mei_bus_type;
+
+	err = driver_register(&driver->driver);
+	if (err)
+		return err;
+
+	pr_debug("mei: driver [%s] registered\n", driver->driver.name);
+
+	return 0;
+}
+EXPORT_SYMBOL(mei_add_driver);
+
+void mei_del_driver(struct mei_bus_driver *driver)
+{
+	driver_unregister(&driver->driver);
+
+	pr_debug("mei: driver [%s] unregistered\n", driver->driver.name);
+}
+EXPORT_SYMBOL(mei_del_driver);

@@ -88,4 +88,7 @@ struct mei_bus_driver {
 	int (*remove)(struct mei_bus_client *client);
 };
 
+int mei_add_driver(struct mei_bus_driver *driver);
+void mei_del_driver(struct mei_bus_driver *driver);
+
 #endif /* _LINUX_MEI_BUS_H */
