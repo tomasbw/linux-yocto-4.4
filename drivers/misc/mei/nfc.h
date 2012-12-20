@@ -119,4 +119,10 @@ struct mei_nfc_connect_resp {
 #define MEI_NFC_SUBCMD_CONNECT    0x00
 #define MEI_NFC_SUBCMD_IF_VERSION 0x01
 
+/* Vendors */
+#define MEI_NFC_VENDOR_INSIDE 0x00
+
+/* Radio types */
+#define MEI_NFC_VENDOR_INSIDE_UREAD 0x00
+
 #endif /* _MEI_NFC_H */
