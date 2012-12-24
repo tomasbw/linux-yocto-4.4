@@ -287,12 +287,14 @@ read_init_dma_fail:
 select_init_dma_fail:
 	dma_unmap_sg(i2c->dev, &i2c->sg_io[0], 1, DMA_TO_DEVICE);
 select_init_pio_fail:
+	dmaengine_terminate_all(i2c->dmach);
 	return -EINVAL;
 
 /* Write failpath. */
 write_init_dma_fail:
 	dma_unmap_sg(i2c->dev, i2c->sg_io, 2, DMA_TO_DEVICE);
 write_init_pio_fail:
+	dmaengine_terminate_all(i2c->dmach);
 	return -EINVAL;
 }
 
@@ -357,7 +359,7 @@ static int mxs_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 
 static u32 mxs_i2c_func(struct i2c_adapter *adap)
 {
-	return I2C_FUNC_I2C | (I2C_FUNC_SMBUS_EMUL & ~I2C_FUNC_SMBUS_QUICK);
+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
 }
 
 static irqreturn_t mxs_i2c_isr(int this_irq, void *dev_id)
