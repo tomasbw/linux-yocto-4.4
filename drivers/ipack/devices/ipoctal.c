@@ -207,6 +207,7 @@ static void ipoctal_irq_channel(struct ipoctal_channel *channel)
 		if (channel->board_id == IPACK1_DEVICE_ID_SBS_OCTAL_485) {
 			iowrite8(CR_CMD_NEGATE_RTSN, &channel->regs->w.cr);
 			iowrite8(CR_ENABLE_RX, &channel->regs->w.cr);
+			channel->rx_enable = 1;
 		}
 	}
 
@@ -288,7 +289,7 @@ static int ipoctal_inst_slot(struct ipoctal *ipoctal, unsigned int bus_nr,
 	ipoctal->mem8_space =
 		devm_ioremap_nocache(&ipoctal->dev->dev,
 				     region->start, 0x8000);
-	if (!addr) {
+	if (!ipoctal->mem8_space) {
 		dev_err(&ipoctal->dev->dev,
 			"Unable to map slot [%d:%d] MEM8 space!\n",
 			bus_nr, slot);
