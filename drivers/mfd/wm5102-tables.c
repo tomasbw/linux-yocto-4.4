@@ -102,6 +102,7 @@ const struct regmap_irq_chip wm5102_aod = {
 	.mask_base = ARIZONA_AOD_IRQ_MASK_IRQ1,
 	.ack_base = ARIZONA_AOD_IRQ1,
 	.wake_base = ARIZONA_WAKE_CONTROL,
+	.wake_invert = 1,
 	.num_regs = 1,
 	.irqs = wm5102_aod_irqs,
 	.num_irqs = ARRAY_SIZE(wm5102_aod_irqs),
@@ -1892,7 +1893,7 @@ static bool wm5102_volatile_register(struct device *dev, unsigned int reg)
 	}
 }
 
-#define WM5102_MAX_REGISTER 0x1a8fff
+#define WM5102_MAX_REGISTER 0x1a9800
 
 const struct regmap_config wm5102_spi_regmap = {
 	.reg_bits = 32,

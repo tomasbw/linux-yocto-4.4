@@ -716,7 +716,6 @@ static int samsung_pinctrl_register(struct platform_device *pdev,
 	}
 	ctrldesc->pins = pindesc;
 	ctrldesc->npins = drvdata->ctrl->nr_pins;
-	ctrldesc->npins = drvdata->ctrl->nr_pins;
 
 	/* dynamically populate the pin number and pin name for pindesc */
 	for (pin = 0, pdesc = pindesc; pin < ctrldesc->npins; pin++, pdesc++)
@@ -917,11 +916,9 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 
-	drvdata->virt_base = devm_request_and_ioremap(&pdev->dev, res);
-	if (!drvdata->virt_base) {
-		dev_err(dev, "ioremap failed\n");
-		return -ENODEV;
-	}
+	drvdata->virt_base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(drvdata->virt_base))
+		return PTR_ERR(drvdata->virt_base);
 
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (res)

@@ -54,7 +54,6 @@
 #include <linux/parser.h>
 #include <linux/nsproxy.h>
 #include <linux/rcupdate.h>
-#include <linux/kthread.h>
 
 #include <asm/uaccess.h>
 
@@ -417,54 +416,6 @@ void nfs_sb_deactive(struct super_block *sb)
 		deactivate_super(sb);
 }
 EXPORT_SYMBOL_GPL(nfs_sb_deactive);
-
-static int nfs_deactivate_super_async_work(void *ptr)
-{
-	struct super_block *sb = ptr;
-
-	deactivate_super(sb);
-	module_put_and_exit(0);
-	return 0;
-}
-
-/*
- * same effect as deactivate_super, but will do final unmount in kthread
- * context
- */
-static void nfs_deactivate_super_async(struct super_block *sb)
-{
-	struct task_struct *task;
-	char buf[INET6_ADDRSTRLEN + 1];
-	struct nfs_server *server = NFS_SB(sb);
-	struct nfs_client *clp = server->nfs_client;
-
-	if (!atomic_add_unless(&sb->s_active, -1, 1)) {
-		rcu_read_lock();
-		snprintf(buf, sizeof(buf),
-			rpc_peeraddr2str(clp->cl_rpcclient, RPC_DISPLAY_ADDR));
-		rcu_read_unlock();
-
-		__module_get(THIS_MODULE);
-		task = kthread_run(nfs_deactivate_super_async_work, sb,
-				"%s-deactivate-super", buf);
-		if (IS_ERR(task)) {
-			pr_err("%s: kthread_run: %ld\n",
-				__func__, PTR_ERR(task));
-			/* make synchronous call and hope for the best */
-			deactivate_super(sb);
-			module_put(THIS_MODULE);
-		}
-	}
-}
-
-void nfs_sb_deactive_async(struct super_block *sb)
-{
-	struct nfs_server *server = NFS_SB(sb);
-
-	if (atomic_dec_and_test(&server->active))
-		nfs_deactivate_super_async(sb);
-}
-EXPORT_SYMBOL_GPL(nfs_sb_deactive_async);
 
 /*
  * Deliver file system statistics to userspace
@@ -2589,27 +2540,23 @@ nfs_xdev_mount(struct file_system_type *fs_type, int flags,
 	struct nfs_server *server;
 	struct dentry *mntroot = ERR_PTR(-ENOMEM);
 	struct nfs_subversion *nfs_mod = NFS_SB(data->sb)->nfs_client->cl_nfs_mod;
-	int error;
 
-	dprintk("--> nfs_xdev_mount_common()\n");
+	dprintk("--> nfs_xdev_mount()\n");
 
 	mount_info.mntfh = mount_info.cloned->fh;
 
 	/* create a new volume representation */
 	server = nfs_mod->rpc_ops->clone_server(NFS_SB(data->sb), data->fh, data->fattr, data->authflavor);
-	if (IS_ERR(server)) {
-		error = PTR_ERR(server);
-		goto out_err;
-	}
 
-	mntroot = nfs_fs_mount_common(server, flags, dev_name, &mount_info, nfs_mod);
-	dprintk("<-- nfs_xdev_mount_common() = 0\n");
-out:
+	if (IS_ERR(server))
+		mntroot = ERR_CAST(server);
+	else
+		mntroot = nfs_fs_mount_common(server, flags,
+				dev_name, &mount_info, nfs_mod);
+
+	dprintk("<-- nfs_xdev_mount() = %ld\n",
+			IS_ERR(mntroot) ? PTR_ERR(mntroot) : 0L);
 	return mntroot;
-
-out_err:
-	dprintk("<-- nfs_xdev_mount_common() = %d [error]\n", error);
-	goto out;
 }
 
 #if IS_ENABLED(CONFIG_NFS_V4)

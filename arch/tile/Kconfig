@@ -121,6 +121,7 @@ config DEBUG_COPY_FROM_USER
 	def_bool n
 
 config HVC_TILE
+	depends on TTY
 	select HVC_DRIVER
 	def_bool y
 
@@ -139,6 +140,8 @@ config ARCH_DEFCONFIG
 	default "arch/tile/configs/tilegx_defconfig" if TILEGX
 
 source "init/Kconfig"
+
+source "kernel/Kconfig.freezer"
 
 menu "Tilera-specific configuration"
 

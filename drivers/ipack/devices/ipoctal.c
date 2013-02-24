@@ -123,9 +123,9 @@ static int ipoctal_get_icount(struct tty_struct *tty,
 	return 0;
 }
 
-static void ipoctal_irq_rx(struct ipoctal_channel *channel,
-			   struct tty_struct *tty, u8 sr)
+static void ipoctal_irq_rx(struct ipoctal_channel *channel, u8 sr)
 {
+	struct tty_port *port = &channel->tty_port;
 	unsigned char value;
 	unsigned char flag;
 	u8 isr;
@@ -140,7 +140,7 @@ static void ipoctal_irq_rx(struct ipoctal_channel *channel,
 			if (sr & SR_OVERRUN_ERROR) {
 				channel->stats.overrun_err++;
 				/* Overrun doesn't affect the current character*/
-				tty_insert_flip_char(tty, 0, TTY_OVERRUN);
+				tty_insert_flip_char(port, 0, TTY_OVERRUN);
 			}
 			if (sr & SR_PARITY_ERROR) {
 				channel->stats.parity_err++;
@@ -156,7 +156,7 @@ static void ipoctal_irq_rx(struct ipoctal_channel *channel,
 				flag = TTY_BREAK;
 			}
 		}
-		tty_insert_flip_char(tty, value, flag);
+		tty_insert_flip_char(port, value, flag);
 
 		/* Check if there are more characters in RX FIFO
 		 * If there are more, the isr register for this channel
@@ -166,7 +166,7 @@ static void ipoctal_irq_rx(struct ipoctal_channel *channel,
 		sr = ioread8(&channel->regs->r.sr);
 	} while (isr & channel->isr_rx_rdy_mask);
 
-	tty_flip_buffer_push(tty);
+	tty_flip_buffer_push(port);
 }
 
 static void ipoctal_irq_tx(struct ipoctal_channel *channel)
@@ -188,11 +188,6 @@ static void ipoctal_irq_tx(struct ipoctal_channel *channel)
 static void ipoctal_irq_channel(struct ipoctal_channel *channel)
 {
 	u8 isr, sr;
-	struct tty_struct *tty;
-
-	tty = tty_port_tty_get(&channel->tty_port);
-	if (!tty)
-		return;
 
 	spin_lock(&channel->lock);
 	/* The HW is organized in pair of channels.  See which register we need
@@ -213,13 +208,12 @@ static void ipoctal_irq_channel(struct ipoctal_channel *channel)
 
 	/* RX data */
 	if ((isr & channel->isr_rx_rdy_mask) && (sr & SR_RX_READY))
-		ipoctal_irq_rx(channel, tty, sr);
+		ipoctal_irq_rx(channel, sr);
 
 	/* TX of each character */
 	if ((isr & channel->isr_tx_rdy_mask) && (sr & SR_TX_READY))
 		ipoctal_irq_tx(channel);
 
-	tty_kref_put(tty);
 	spin_unlock(&channel->lock);
 }
 
