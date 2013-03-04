@@ -21,8 +21,6 @@ source "drivers/gpu/vga/Kconfig"
 
 source "drivers/gpu/drm/Kconfig"
 
-source "drivers/gpu/stub/Kconfig"
-
 config VGASTATE
        tristate
        default n
@@ -32,6 +30,30 @@ config VIDEO_OUTPUT_CONTROL
 	help
 	  This framework adds support for low-level control of the video 
 	  output switch.
+
+config DISPLAY_TIMING
+       bool
+
+config VIDEOMODE
+       bool
+
+config OF_DISPLAY_TIMING
+	bool "Enable device tree display timing support"
+	depends on OF
+	select DISPLAY_TIMING
+	help
+	  helper to parse display timings from the devicetree
+
+config OF_VIDEOMODE
+	bool "Enable device tree videomode support"
+	depends on OF
+	select VIDEOMODE
+	select OF_DISPLAY_TIMING
+	help
+	  helper to get videomodes from the devicetree
+
+config HDMI
+	bool
 
 menuconfig FB
 	tristate "Support for frame buffer devices"
@@ -364,7 +386,7 @@ config FB_SA1100
 	  Y here.
 
 config FB_IMX
-	tristate "Freescale i.MX LCD support"
+	tristate "Freescale i.MX1/21/25/27 LCD support"
 	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
@@ -2025,7 +2047,8 @@ config FB_TMIO_ACCELL
 
 config FB_S3C
 	tristate "Samsung S3C framebuffer support"
-	depends on FB && (S3C_DEV_FB || S5P_DEV_FIMD0)
+	depends on FB && (CPU_S3C2416 || ARCH_S3C64XX || ARCH_S5P64X0 || \
+		ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS)
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
@@ -2182,6 +2205,15 @@ config FB_XILINX
 	  Include support for the Xilinx ML300/ML403 reference design
 	  framebuffer. ML300 carries a 640*480 LCD display on the board,
 	  ML403 uses a standard DB15 VGA connector.
+
+config FB_GOLDFISH
+	tristate "Goldfish Framebuffer"
+	depends on FB
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	---help---
+	  Framebuffer driver for Goldfish Virtual Platform
 
 config FB_COBALT
 	tristate "Cobalt server LCD frame buffer support"
@@ -2422,6 +2454,7 @@ config FB_PUV3_UNIGFX
 source "drivers/video/omap/Kconfig"
 source "drivers/video/omap2/Kconfig"
 source "drivers/video/exynos/Kconfig"
+source "drivers/video/mmp/Kconfig"
 source "drivers/video/backlight/Kconfig"
 
 if VT
