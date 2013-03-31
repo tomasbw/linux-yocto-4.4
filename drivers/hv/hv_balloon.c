@@ -117,7 +117,14 @@ union dm_caps {
 	struct {
 		__u64 balloon:1;
 		__u64 hot_add:1;
-		__u64 reservedz:62;
+		/*
+		 * To support guests that may have alignment
+		 * limitations on hot-add, the guest can specify
+		 * its alignment requirements; a value of n
+		 * represents an alignment of 2^n in mega bytes.
+		 */
+		__u64 hot_add_alignment:4;
+		__u64 reservedz:58;
 	} cap_bits;
 	__u64 caps;
 } __packed;
@@ -583,6 +590,16 @@ static void hv_mem_hot_add(unsigned long start, unsigned long size,
 
 		if (ret) {
 			pr_info("hot_add memory failed error is %d\n", ret);
+			if (ret == -EEXIST) {
+				/*
+				 * This error indicates that the error
+				 * is not a transient failure. This is the
+				 * case where the guest's physical address map
+				 * precludes hot adding memory. Stop all further
+				 * memory hot-add.
+				 */
+				do_hot_add = false;
+			}
 			has->ha_end_pfn -= HA_CHUNK;
 			has->covered_end_pfn -=  processed_pfn;
 			break;
@@ -774,7 +791,7 @@ static unsigned long process_hot_add(unsigned long pg_start,
 	 * If the host has specified a hot-add range; deal with it first.
 	 */
 
-	if ((rg_size != 0) && (!dm_device.host_specified_ha_region)) {
+	if (rg_size != 0) {
 		ha_region = kzalloc(sizeof(struct hv_hotadd_state), GFP_KERNEL);
 		if (!ha_region)
 			return 0;
@@ -842,10 +859,29 @@ static void hot_add_req(struct work_struct *dummy)
 		rg_sz = region_size;
 	}
 
-	resp.page_count = process_hot_add(pg_start, pfn_cnt,
-					rg_start, rg_sz);
+	if (do_hot_add)
+		resp.page_count = process_hot_add(pg_start, pfn_cnt,
+						rg_start, rg_sz);
 #endif
+	/*
+	 * The result field of the response structure has the
+	 * following semantics:
+	 *
+	 * 1. If all or some pages hot-added: Guest should return success.
+	 *
+	 * 2. If no pages could be hot-added:
+	 *
+	 * If the guest returns success, then the host
+	 * will not attempt any further hot-add operations. This
+	 * signifies a permanent failure.
+	 *
+	 * If the guest returns failure, then this failure will be
+	 * treated as a transient failure and the host may retry the
+	 * hot-add operation after some delay.
+	 */
 	if (resp.page_count > 0)
+		resp.result = 1;
+	else if (!do_hot_add)
 		resp.result = 1;
 	else
 		resp.result = 0;
@@ -997,6 +1033,14 @@ static int  alloc_balloon_pages(struct hv_dynmem_device *dm, int num_pages,
 
 		dm->num_pages_ballooned += alloc_unit;
 
+		/*
+		 * If we allocatted 2M pages; split them so we
+		 * can free them in any order we get.
+		 */
+
+		if (alloc_unit != 1)
+			split_page(pg, get_order(alloc_unit << PAGE_SHIFT));
+
 		bl_resp->range_count++;
 		bl_resp->range_array[i].finfo.start_page =
 			page_to_pfn(pg);
@@ -1023,9 +1067,10 @@ static void balloon_up(struct work_struct *dummy)
 
 
 	/*
-	 * Currently, we only support 4k allocations.
+	 * We will attempt 2M allocations. However, if we fail to
+	 * allocate 2M chunks, we will go back to 4k allocations.
 	 */
-	alloc_unit = 1;
+	alloc_unit = 512;
 
 	while (!done) {
 		bl_resp = (struct dm_balloon_response *)send_buffer;
@@ -1040,6 +1085,11 @@ static void balloon_up(struct work_struct *dummy)
 		num_ballooned = alloc_balloon_pages(&dm_device, num_pages,
 						bl_resp, alloc_unit,
 						 &alloc_error);
+
+		if ((alloc_error) && (alloc_unit != 1)) {
+			alloc_unit = 1;
+			continue;
+		}
 
 		if ((alloc_error) || (num_ballooned == num_pages)) {
 			bl_resp->more_pages = 0;
@@ -1365,6 +1415,12 @@ static int balloon_probe(struct hv_device *dev,
 
 	cap_msg.caps.cap_bits.balloon = 1;
 	cap_msg.caps.cap_bits.hot_add = 1;
+
+	/*
+	 * Specify our alignment requirements as it relates
+	 * memory hot-add. Specify 128MB alignment.
+	 */
+	cap_msg.caps.cap_bits.hot_add_alignment = 7;
 
 	/*
 	 * Currently the host does not use these
