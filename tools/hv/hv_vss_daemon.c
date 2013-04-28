@@ -21,14 +21,18 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/poll.h>
+#include <sys/ioctl.h>
 #include <linux/types.h>
+#include <fcntl.h>
 #include <stdio.h>
+#include <mntent.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <linux/fs.h>
 #include <linux/connector.h>
 #include <linux/hyperv.h>
 #include <linux/netlink.h>
@@ -43,44 +47,60 @@ static struct sockaddr_nl addr;
 #endif
 
 
+static int vss_do_freeze(char *dir, unsigned int cmd, char *fs_op)
+{
+	int ret, fd = open(dir, O_RDONLY);
+
+	if (fd < 0)
+		return 1;
+	ret = ioctl(fd, cmd, 0);
+	syslog(LOG_INFO, "VSS: %s of %s: %s\n", fs_op, dir, strerror(errno));
+	close(fd);
+	return !!ret;
+}
+
 static int vss_operate(int operation)
 {
 	char *fs_op;
-	char cmd[512];
-	char buf[512];
-	FILE *file;
-	char *p;
-	char *x;
-	int error;
+	char match[] = "/dev/";
+	FILE *mounts;
+	struct mntent *ent;
+	unsigned int cmd;
+	int error = 0, root_seen = 0;
 
 	switch (operation) {
 	case VSS_OP_FREEZE:
-		fs_op = "-f ";
+		cmd = FIFREEZE;
+		fs_op = "freeze";
 		break;
 	case VSS_OP_THAW:
-		fs_op = "-u ";
+		cmd = FITHAW;
+		fs_op = "thaw";
 		break;
+	default:
+		return -1;
 	}
 
-	file = popen("mount | awk '/^\/dev\// { print $3}'", "r");
-	if (file == NULL)
-		return;
+	mounts = setmntent("/proc/mounts", "r");
+	if (mounts == NULL)
+		return -1;
 
-	while ((p = fgets(buf, sizeof(buf), file)) != NULL) {
-		x = strchr(p, '\n');
-		*x = '\0';
-		if (!strncmp(p, "/", sizeof("/")))
+	while ((ent = getmntent(mounts))) {
+		if (strncmp(ent->mnt_fsname, match, strlen(match)))
 			continue;
-
-		sprintf(cmd, "%s %s %s", "fsfreeze ", fs_op, p);
-		syslog(LOG_INFO, "VSS cmd is %s\n", cmd);
-		error = system(cmd);
+		if (strcmp(ent->mnt_type, "iso9660") == 0)
+			continue;
+		if (strcmp(ent->mnt_dir, "/") == 0) {
+			root_seen = 1;
+			continue;
+		}
+		error |= vss_do_freeze(ent->mnt_dir, cmd, fs_op);
 	}
-	pclose(file);
+	endmntent(mounts);
 
-	sprintf(cmd, "%s %s %s", "fsfreeze ", fs_op, "/");
-	syslog(LOG_INFO, "VSS cmd is %s\n", cmd);
-	error = system(cmd);
+	if (root_seen) {
+		error |= vss_do_freeze("/", cmd, fs_op);
+	}
 
 	return error;
 }
@@ -128,7 +148,9 @@ int main(void)
 	int	op;
 	struct hv_vss_msg *vss_msg;
 
-	daemon(1, 0);
+	if (daemon(1, 0))
+		return 1;
+
 	openlog("Hyper-V VSS", 0, LOG_USER);
 	syslog(LOG_INFO, "VSS starting; pid is:%d", getpid());
 
@@ -182,11 +204,18 @@ int main(void)
 		len = recvfrom(fd, vss_recv_buffer, sizeof(vss_recv_buffer), 0,
 				addr_p, &addr_l);
 
-		if (len < 0 || addr.nl_pid) {
+		if (len < 0) {
 			syslog(LOG_ERR, "recvfrom failed; pid:%u error:%d %s",
 					addr.nl_pid, errno, strerror(errno));
 			close(fd);
 			return -1;
+		}
+
+		if (addr.nl_pid) {
+			syslog(LOG_WARNING,
+				"Received packet from untrusted pid:%u",
+				addr.nl_pid);
+			continue;
 		}
 
 		incoming_msg = (struct nlmsghdr *)vss_recv_buffer;
