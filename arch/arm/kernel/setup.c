@@ -56,7 +56,6 @@
 #include <asm/virt.h>
 
 #include "atags.h"
-#include "tcm.h"
 
 
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
@@ -291,10 +290,10 @@ static int cpu_has_aliasing_icache(unsigned int arch)
 
 static void __init cacheid_init(void)
 {
-	unsigned int cachetype = read_cpuid_cachetype();
 	unsigned int arch = cpu_architecture();
 
 	if (arch >= CPU_ARCH_ARMv6) {
+		unsigned int cachetype = read_cpuid_cachetype();
 		if ((cachetype & (7 << 29)) == 4 << 29) {
 			/* ARMv7 register format */
 			arch = CPU_ARCH_ARMv7;
@@ -390,7 +389,7 @@ static void __init feat_v6_fixup(void)
  *
  * cpu_init sets up the per-CPU stacks.
  */
-void cpu_init(void)
+void notrace cpu_init(void)
 {
 	unsigned int cpu = smp_processor_id();
 	struct stack *stk = &stacks[cpu];
@@ -797,8 +796,6 @@ void __init setup_arch(char **cmdline_p)
 		hyp_mode_check();
 
 	reserve_crashkernel();
-
-	tcm_init();
 
 #ifdef CONFIG_MULTI_IRQ_HANDLER
 	handle_arch_irq = mdesc->handle_irq;
