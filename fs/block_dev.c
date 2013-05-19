@@ -27,6 +27,7 @@
 #include <linux/namei.h>
 #include <linux/log2.h>
 #include <linux/cleancache.h>
+#include <linux/aio.h>
 #include <asm/uaccess.h>
 #include "internal.h"
 
@@ -1555,7 +1556,7 @@ static ssize_t blkdev_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		return 0;
 
 	size -= pos;
-	if (size < INT_MAX)
+	if (size < iocb->ki_left)
 		nr_segs = iov_shorten((struct iovec *)iov, nr_segs, size);
 	return generic_file_aio_read(iocb, iov, nr_segs, pos);
 }
