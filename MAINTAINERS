@@ -3220,7 +3220,7 @@ F:	lib/fault-inject.c
 
 FCOE SUBSYSTEM (libfc, libfcoe, fcoe)
 M:	Robert Love <robert.w.love@intel.com>
-L:	devel@open-fcoe.org
+L:	fcoe-devel@open-fcoe.org
 W:	www.Open-FCoE.org
 S:	Supported
 F:	drivers/scsi/libfc/
@@ -4586,7 +4586,7 @@ F:	fs/jbd2/
 F:	include/linux/jbd2.h
 
 JSM Neo PCI based serial card
-M:	Lucas Tavares <lucaskt@linux.vnet.ibm.com>
+M:	Thadeu Lima de Souza Cascardo <cascardo@linux.vnet.ibm.com>
 L:	linux-serial@vger.kernel.org
 S:	Maintained
 F:	drivers/tty/serial/jsm/
@@ -7793,7 +7793,7 @@ F:	drivers/staging/media/solo6x10/
 STAGING - SPEAKUP CONSOLE SPEECH DRIVER
 M:	William Hubbs <w.d.hubbs@gmail.com>
 M:	Chris Brannon <chris@the-brannons.com>
-M:	Kirk Reiser <kirk@braille.uwo.ca>
+M:	Kirk Reiser <kirk@reisers.ca>
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 L:	speakup@braille.uwo.ca
 W:	http://www.linux-speakup.org/
