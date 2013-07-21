@@ -150,6 +150,7 @@ void mei_reset(struct mei_device *dev, int interrupts_enabled)
 
 	if (dev->dev_state != MEI_DEV_INITIALIZING &&
 	    dev->dev_state != MEI_DEV_POWER_UP) {
+
 		if (dev->dev_state != MEI_DEV_DISABLED &&
 		    dev->dev_state != MEI_DEV_POWER_DOWN)
 			dev->dev_state = MEI_DEV_RESETTING;
