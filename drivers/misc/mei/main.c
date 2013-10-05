@@ -60,48 +60,45 @@ static int mei_open(struct inode *inode, struct file *file)
 
 	int err;
 
-	err = -ENODEV;
 	if (!misc->parent)
-		goto out;
+		return -ENODEV;
 
 	pdev = container_of(misc->parent, struct pci_dev, dev);
 
 	dev = pci_get_drvdata(pdev);
 	if (!dev)
-		goto out;
+		return -ENODEV;
 
 	mutex_lock(&dev->device_lock);
-	err = -ENOMEM;
-	cl = mei_cl_allocate(dev);
-	if (!cl)
-		goto out_unlock;
+
+	cl = NULL;
 
 	err = -ENODEV;
 	if (dev->dev_state != MEI_DEV_ENABLED) {
 		dev_dbg(&dev->pdev->dev, "dev_state != MEI_ENABLED  dev_state = %s\n",
 		    mei_dev_state_str(dev->dev_state));
-		goto out_unlock;
-	}
-	err = -EMFILE;
-	if (dev->open_handle_count >= MEI_MAX_OPEN_HANDLE_COUNT) {
-		dev_err(&dev->pdev->dev, "open_handle_count exceded %d",
-			MEI_MAX_OPEN_HANDLE_COUNT);
-		goto out_unlock;
+		goto err_unlock;
 	}
 
+	err = -ENOMEM;
+	cl = mei_cl_allocate(dev);
+	if (!cl)
+		goto err_unlock;
+
+	/* open_handle_count check is handled in the mei_cl_link */
 	err = mei_cl_link(cl, MEI_HOST_CLIENT_ID_ANY);
 	if (err)
-		goto out_unlock;
+		goto err_unlock;
 
 	file->private_data = cl;
+
 	mutex_unlock(&dev->device_lock);
 
 	return nonseekable_open(inode, file);
 
-out_unlock:
+err_unlock:
 	mutex_unlock(&dev->device_lock);
 	kfree(cl);
-out:
 	return err;
 }
 
@@ -144,10 +141,6 @@ static int mei_release(struct inode *inode, struct file *file)
 	    cl->host_client_id,
 	    cl->me_client_id);
 
-	if (dev->open_handle_count > 0) {
-		clear_bit(cl->host_client_id, dev->host_clients_map);
-		dev->open_handle_count--;
-	}
 	mei_cl_unlink(cl);
 
 
@@ -252,19 +245,16 @@ static ssize_t mei_read(struct file *file, char __user *ubuf,
 		mutex_unlock(&dev->device_lock);
 
 		if (wait_event_interruptible(cl->rx_wait,
-			(MEI_READ_COMPLETE == cl->reading_state ||
-			 MEI_FILE_INITIALIZING == cl->state ||
-			 MEI_FILE_DISCONNECTED == cl->state ||
-			 MEI_FILE_DISCONNECTING == cl->state))) {
+				MEI_READ_COMPLETE == cl->reading_state ||
+				mei_cl_is_transitioning(cl))) {
+
 			if (signal_pending(current))
 				return -EINTR;
 			return -ERESTARTSYS;
 		}
 
 		mutex_lock(&dev->device_lock);
-		if (MEI_FILE_INITIALIZING == cl->state ||
-		    MEI_FILE_DISCONNECTED == cl->state ||
-		    MEI_FILE_DISCONNECTING == cl->state) {
+		if (mei_cl_is_transitioning(cl)) {
 			rets = -EBUSY;
 			goto out;
 		}
@@ -504,11 +494,11 @@ static int mei_ioctl_connect_client(struct file *file,
 			rets = -ENODEV;
 			goto end;
 		}
-		clear_bit(cl->host_client_id, dev->host_clients_map);
 		mei_cl_unlink(cl);
 
 		kfree(cl);
 		cl = NULL;
+		dev->iamthif_open_count++;
 		file->private_data = &dev->iamthif_cl;
 
 		client = &data->out_client_properties;
