@@ -875,7 +875,6 @@ void mei_cl_complete(struct mei_cl *cl, struct mei_cl_cb *cb)
 {
 	if (cb->fop_type == MEI_FOP_WRITE) {
 		mei_io_cb_free(cb);
-		cb = NULL;
 		cl->writing_state = MEI_WRITE_COMPLETE;
 		if (waitqueue_active(&cl->tx_wait))
 			wake_up_interruptible(&cl->tx_wait);
