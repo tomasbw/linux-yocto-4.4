@@ -214,9 +214,9 @@ static void genwqe_remove_mappings(struct genwqe_file *cfile)
 		 */
 		dev_err(&pci_dev->dev,
 			"[%s] %d. cleanup mapping: u_vaddr=%p "
-			"u_kaddr=%016lx dma_addr=%llx\n", __func__, i++,
+			"u_kaddr=%016lx dma_addr=%lx\n", __func__, i++,
 			dma_map->u_vaddr, (unsigned long)dma_map->k_vaddr,
-			dma_map->dma_addr);
+			(unsigned long)dma_map->dma_addr);
 
 		if (dma_map->type == GENWQE_MAPPING_RAW) {
 			/* we allocated this dynamically */
@@ -507,7 +507,8 @@ static int do_flash_update(struct genwqe_file *cfile,
 {
 	int rc = 0;
 	int blocks_to_flash;
-	u64 dma_addr, flash = 0;
+	dma_addr_t dma_addr;
+	u64 flash = 0;
 	size_t tocopy = 0;
 	u8 __user *buf;
 	u8 *xbuf;
@@ -516,17 +517,11 @@ static int do_flash_update(struct genwqe_file *cfile,
 	struct genwqe_dev *cd = cfile->cd;
 	struct pci_dev *pci_dev = cd->pci_dev;
 
-	if ((load->size & 0x3) != 0) {
-		dev_err(&pci_dev->dev,
-			"err: buf %d bytes not 4 bytes aligned!\n",
-			load->size);
+	if ((load->size & 0x3) != 0)
 		return -EINVAL;
-	}
-	if (((unsigned long)(load->data_addr) & ~PAGE_MASK) != 0) {
-		dev_err(&pci_dev->dev,
-			"err: buf is not page aligned!\n");
+
+	if (((unsigned long)(load->data_addr) & ~PAGE_MASK) != 0)
 		return -EINVAL;
-	}
 
 	/* FIXME Bits have changed for new service layer! */
 	switch ((char)load->partition) {
@@ -538,20 +533,13 @@ static int do_flash_update(struct genwqe_file *cfile,
 		break;		/* download/erase_first/part_1 */
 	case 'v':		/* cmdopts = 0x0c (VPD) */
 	default:
-		dev_err(&pci_dev->dev,
-			"err: invalid partition %02x!\n", load->partition);
 		return -EINVAL;
 	}
-	dev_info(&pci_dev->dev,
-		 "[%s] start flash update UID: 0x%x size: %u bytes part: %c\n",
-		 __func__, load->uid, load->size, (char)load->partition);
 
 	buf = (u8 __user *)load->data_addr;
 	xbuf = __genwqe_alloc_consistent(cd, FLASH_BLOCK, &dma_addr);
-	if (xbuf == NULL) {
-		dev_err(&pci_dev->dev, "err: no memory\n");
+	if (xbuf == NULL)
 		return -ENOMEM;
-	}
 
 	blocks_to_flash = load->size / FLASH_BLOCK;
 	while (load->size) {
@@ -565,15 +553,15 @@ static int do_flash_update(struct genwqe_file *cfile,
 
 		rc = copy_from_user(xbuf, buf, tocopy);
 		if (rc) {
-			dev_err(&pci_dev->dev,
-				"err: could not copy all data rc=%d\n", rc);
+			rc = -EFAULT;
 			goto free_buffer;
 		}
 		crc = genwqe_crc32(xbuf, tocopy, 0xffffffff);
 
-		dev_info(&pci_dev->dev,
-			 "[%s] DMA: 0x%llx CRC: %08x SZ: %ld %d\n",
-			__func__, dma_addr, crc, tocopy, blocks_to_flash);
+		dev_dbg(&pci_dev->dev,
+			"[%s] DMA: %lx CRC: %08x SZ: %ld %d\n",
+			__func__, (unsigned long)dma_addr, crc, tocopy,
+			blocks_to_flash);
 
 		/* prepare DDCB for SLU process */
 		req = ddcb_requ_alloc();
@@ -626,21 +614,11 @@ static int do_flash_update(struct genwqe_file *cfile,
 		load->progress = req->progress;
 
 		if (rc < 0) {
-			dev_err(&pci_dev->dev,
-				"  [%s] DDCB returned (RETC=%x ATTN=%x "
-				"PROG=%x rc=%d)\n", __func__, req->retc,
-				req->attn, req->progress, rc);
-
 			ddcb_requ_free(req);
 			goto free_buffer;
 		}
 
 		if (req->retc != DDCB_RETC_COMPLETE) {
-			dev_info(&pci_dev->dev,
-				 "  [%s] DDCB returned (RETC=%x ATTN=%x "
-				 "PROG=%x)\n", __func__, req->retc,
-				 req->attn, req->progress);
-
 			rc = -EIO;
 			ddcb_requ_free(req);
 			goto free_buffer;
@@ -662,7 +640,8 @@ static int do_flash_read(struct genwqe_file *cfile,
 			 struct genwqe_bitstream *load)
 {
 	int rc, blocks_to_flash;
-	u64 dma_addr, flash = 0;
+	dma_addr_t dma_addr;
+	u64 flash = 0;
 	size_t tocopy = 0;
 	u8 __user *buf;
 	u8 *xbuf;
@@ -671,16 +650,11 @@ static int do_flash_read(struct genwqe_file *cfile,
 	struct pci_dev *pci_dev = cd->pci_dev;
 	struct genwqe_ddcb_cmd *cmd;
 
-	if ((load->size & 0x3) != 0) {
-		dev_err(&pci_dev->dev,
-			"err: buf size %d bytes not 4 bytes aligned!\n",
-			load->size);
+	if ((load->size & 0x3) != 0)
 		return -EINVAL;
-	}
-	if (((unsigned long)(load->data_addr) & ~PAGE_MASK) != 0) {
-		dev_err(&pci_dev->dev, "err: buf is not page aligned!\n");
+
+	if (((unsigned long)(load->data_addr) & ~PAGE_MASK) != 0)
 		return -EINVAL;
-	}
 
 	/* FIXME Bits have changed for new service layer! */
 	switch ((char)load->partition) {
@@ -692,20 +666,13 @@ static int do_flash_read(struct genwqe_file *cfile,
 		break;		/* upload/part_1 */
 	case 'v':
 	default:
-		dev_err(&pci_dev->dev,
-			"err: invalid partition %02x!\n", load->partition);
 		return -EINVAL;
 	}
-	dev_info(&pci_dev->dev,
-		 "[%s] start flash read UID: 0x%x size: %u bytes part: %c\n",
-		 __func__, load->uid, load->size, (char)load->partition);
 
 	buf = (u8 __user *)load->data_addr;
 	xbuf = __genwqe_alloc_consistent(cd, FLASH_BLOCK, &dma_addr);
-	if (xbuf == NULL) {
-		dev_err(&pci_dev->dev, "err: no memory\n");
+	if (xbuf == NULL)
 		return -ENOMEM;
-	}
 
 	blocks_to_flash = load->size / FLASH_BLOCK;
 	while (load->size) {
@@ -715,9 +682,10 @@ static int do_flash_read(struct genwqe_file *cfile,
 		 */
 		tocopy = min_t(size_t, load->size, FLASH_BLOCK);
 
-		dev_info(&pci_dev->dev,
-			 "[%s] DMA: 0x%llx SZ: %ld %d\n",
-			 __func__, dma_addr, tocopy, blocks_to_flash);
+		dev_dbg(&pci_dev->dev,
+			"[%s] DMA: %lx SZ: %ld %d\n",
+			__func__, (unsigned long)dma_addr, tocopy,
+			blocks_to_flash);
 
 		/* prepare DDCB for SLU process */
 		cmd = ddcb_requ_alloc();
@@ -735,7 +703,7 @@ static int do_flash_read(struct genwqe_file *cfile,
 			*(__be64 *)&cmd->__asiv[16] = cpu_to_be64(flash);
 			*(__be32 *)&cmd->__asiv[24] = cpu_to_be32(0);
 			cmd->__asiv[24] = load->uid;
-			*(__be32 *)&cmd->__asiv[28] = cpu_to_be32(0)  /* CRC */;
+			*(__be32 *)&cmd->__asiv[28] = cpu_to_be32(0) /* CRC */;
 			cmd->asiv_length = 32; /* bytes included in crc calc */
 		} else {	/* setup DDCB for ATS architecture */
 			*(__be64 *)&cmd->asiv[0]  = cpu_to_be64(dma_addr);
@@ -761,20 +729,13 @@ static int do_flash_read(struct genwqe_file *cfile,
 		load->progress = cmd->progress;
 
 		if ((rc < 0) && (rc != -EBADMSG)) {
-			dev_err(&pci_dev->dev,
-				"  [%s] DDCB returned (RETC=%x ATTN=%x "
-				"PROG=%x rc=%d)\n", __func__, cmd->retc,
-				cmd->attn, cmd->progress, rc);
 			ddcb_requ_free(cmd);
 			goto free_buffer;
 		}
 
 		rc = copy_to_user(buf, xbuf, tocopy);
 		if (rc) {
-			dev_err(&pci_dev->dev,
-				"  [%s] copy data to user failed rc=%d\n",
-				__func__, rc);
-			rc = -EIO;
+			rc = -EFAULT;
 			ddcb_requ_free(cmd);
 			goto free_buffer;
 		}
@@ -784,10 +745,6 @@ static int do_flash_read(struct genwqe_file *cfile,
 		     (cmd->attn != 0x02)) ||  /* Normally ignore CRC error */
 		    ((cmd->retc == DDCB_RETC_COMPLETE) &&
 		     (cmd->attn != 0x00))) {  /* Everything was fine */
-			dev_err(&pci_dev->dev,
-				"  [%s] DDCB returned (RETC=%x ATTN=%x "
-				"PROG=%x rc=%d)\n", __func__, cmd->retc,
-				cmd->attn, cmd->progress, rc);
 			rc = -EIO;
 			ddcb_requ_free(cmd);
 			goto free_buffer;
@@ -906,13 +863,13 @@ static int ddcb_cmd_fixups(struct genwqe_file *cfile, struct ddcb_requ *req)
 	struct genwqe_dev *cd = cfile->cd;
 	struct genwqe_ddcb_cmd *cmd = &req->cmd;
 	struct dma_mapping *m;
-	struct pci_dev *pci_dev = cd->pci_dev;
 	const char *type = "UNKNOWN";
 
 	for (i = 0, asiv_offs = 0x00; asiv_offs <= 0x58;
 	     i++, asiv_offs += 0x08) {
 
-		u64 u_addr, d_addr;
+		u64 u_addr;
+		dma_addr_t d_addr;
 		u32 u_size = 0;
 		u64 ats_flags;
 
@@ -1018,9 +975,6 @@ static int ddcb_cmd_fixups(struct genwqe_file *cfile, struct ddcb_requ *req)
 			break;
 		}
 		default:
-			dev_err(&pci_dev->dev,
-				"[%s] err: invalid ATS flags %01llx\n",
-				__func__, ats_flags);
 			rc = -EINVAL;
 			goto err_out;
 		}
@@ -1028,7 +982,6 @@ static int ddcb_cmd_fixups(struct genwqe_file *cfile, struct ddcb_requ *req)
 	return 0;
 
  err_out:
-	dev_err(&pci_dev->dev, "[%s] err: rc=%d\n", __func__, rc);
 	ddcb_cmd_cleanup(cfile, req);
 	return rc;
 }
@@ -1063,7 +1016,6 @@ static int do_execute_ddcb(struct genwqe_file *cfile,
 	struct genwqe_ddcb_cmd *cmd;
 	struct ddcb_requ *req;
 	struct genwqe_dev *cd = cfile->cd;
-	struct pci_dev *pci_dev = cd->pci_dev;
 
 	cmd = ddcb_requ_alloc();
 	if (cmd == NULL)
@@ -1072,8 +1024,6 @@ static int do_execute_ddcb(struct genwqe_file *cfile,
 	req = container_of(cmd, struct ddcb_requ, cmd);
 
 	if (copy_from_user(cmd, (void __user *)arg, sizeof(*cmd))) {
-		dev_err(&pci_dev->dev,
-			"err: could not copy params from user\n");
 		ddcb_requ_free(cmd);
 		return -EFAULT;
 	}
@@ -1087,8 +1037,6 @@ static int do_execute_ddcb(struct genwqe_file *cfile,
 	   back since the copy got modified by the driver. */
 	if (copy_to_user((void __user *)arg, cmd,
 			 sizeof(*cmd) - DDCB_ASIV_LENGTH)) {
-		dev_err(&pci_dev->dev,
-			"err: could not copy params to user\n");
 		ddcb_requ_free(cmd);
 		return -EFAULT;
 	}
@@ -1114,12 +1062,9 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 	struct genwqe_reg_io __user *io;
 	u64 val;
 	u32 reg_offs;
-	struct pci_dev *pci_dev = cd->pci_dev;
 
-	if (_IOC_TYPE(cmd) != GENWQE_IOC_CODE) {
-		dev_err(&pci_dev->dev, "err: ioctl code does not match!\n");
+	if (_IOC_TYPE(cmd) != GENWQE_IOC_CODE)
 		return -EINVAL;
-	}
 
 	switch (cmd) {
 
@@ -1131,10 +1076,9 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 	case GENWQE_READ_REG64: {
 		io = (struct genwqe_reg_io __user *)arg;
 
-		if (get_user(reg_offs, &io->num)) {
-			dev_err(&pci_dev->dev, "err: reg read64\n");
+		if (get_user(reg_offs, &io->num))
 			return -EFAULT;
-		}
+
 		if ((reg_offs >= cd->mmio_len) || (reg_offs & 0x7))
 			return -EINVAL;
 
@@ -1152,17 +1096,15 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 		if ((filp->f_flags & O_ACCMODE) == O_RDONLY)
 			return -EPERM;
 
-		if (get_user(reg_offs, &io->num)) {
-			dev_err(&pci_dev->dev, "err: reg write64\n");
+		if (get_user(reg_offs, &io->num))
 			return -EFAULT;
-		}
+
 		if ((reg_offs >= cd->mmio_len) || (reg_offs & 0x7))
 			return -EINVAL;
 
-		if (get_user(val, &io->val64)) {
-			dev_err(&pci_dev->dev, "err: reg write64\n");
+		if (get_user(val, &io->val64))
 			return -EFAULT;
-		}
+
 		__genwqe_writeq(cd, reg_offs, val);
 		return 0;
 	}
@@ -1170,10 +1112,9 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 	case GENWQE_READ_REG32: {
 		io = (struct genwqe_reg_io __user *)arg;
 
-		if (get_user(reg_offs, &io->num)) {
-			dev_err(&pci_dev->dev, "err: reg read32\n");
+		if (get_user(reg_offs, &io->num))
 			return -EFAULT;
-		}
+
 		if ((reg_offs >= cd->mmio_len) || (reg_offs & 0x3))
 			return -EINVAL;
 
@@ -1191,17 +1132,15 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 		if ((filp->f_flags & O_ACCMODE) == O_RDONLY)
 			return -EPERM;
 
-		if (get_user(reg_offs, &io->num)) {
-			dev_err(&pci_dev->dev, "err: reg write32\n");
+		if (get_user(reg_offs, &io->num))
 			return -EFAULT;
-		}
+
 		if ((reg_offs >= cd->mmio_len) || (reg_offs & 0x3))
 			return -EINVAL;
 
-		if (get_user(val, &io->val64)) {
-			dev_err(&pci_dev->dev, "err: reg write32\n");
+		if (get_user(val, &io->val64))
 			return -EFAULT;
-		}
+
 		__genwqe_writel(cd, reg_offs, val);
 		return 0;
 	}
@@ -1217,19 +1156,14 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 			return -EPERM;
 
 		if (copy_from_user(&load, (void __user *)arg,
-				   sizeof(load))) {
-			dev_err(&pci_dev->dev,
-				"err: could not copy params from user\n");
+				   sizeof(load)))
 			return -EFAULT;
-		}
+
 		rc = do_flash_update(cfile, &load);
 
-		if (copy_to_user((void __user *)arg, &load, sizeof(load))) {
-			dev_err(&pci_dev->dev,
-				"err: could not copy params to user\n");
+		if (copy_to_user((void __user *)arg, &load, sizeof(load)))
 			return -EFAULT;
-		}
-		dev_info(&pci_dev->dev, "[%s] rc=%d\n", __func__, rc);
+
 		return rc;
 	}
 
@@ -1242,20 +1176,14 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 		if (genwqe_flash_readback_fails(cd))
 			return -ENOSPC;	 /* known to fail for old versions */
 
-		if (copy_from_user(&load, (void __user *)arg,
-				   sizeof(load))) {
-			dev_err(&pci_dev->dev,
-				"err: could not copy params from user\n");
+		if (copy_from_user(&load, (void __user *)arg, sizeof(load)))
 			return -EFAULT;
-		}
+
 		rc = do_flash_read(cfile, &load);
 
-		if (copy_to_user((void __user *)arg, &load, sizeof(load))) {
-			dev_err(&pci_dev->dev,
-				"err: could not copy params to user\n");
+		if (copy_to_user((void __user *)arg, &load, sizeof(load)))
 			return -EFAULT;
-		}
-		dev_info(&pci_dev->dev, "[%s] rc=%d\n", __func__, rc);
+
 		return rc;
 	}
 
@@ -1263,24 +1191,18 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 	case GENWQE_PIN_MEM: {
 		struct genwqe_mem m;
 
-		if (copy_from_user(&m, (void __user *)arg,
-				   sizeof(m))) {
-			dev_err(&pci_dev->dev,
-				"err: could not copy params from user\n");
+		if (copy_from_user(&m, (void __user *)arg, sizeof(m)))
 			return -EFAULT;
-		}
+
 		return genwqe_pin_mem(cfile, &m);
 	}
 
 	case GENWQE_UNPIN_MEM: {
 		struct genwqe_mem m;
 
-		if (copy_from_user(&m, (void __user *)arg,
-				   sizeof(m))) {
-			dev_err(&pci_dev->dev,
-				"err: could not copy params from user\n");
+		if (copy_from_user(&m, (void __user *)arg, sizeof(m)))
 			return -EFAULT;
-		}
+
 		return genwqe_unpin_mem(cfile, &m);
 	}
 
@@ -1290,16 +1212,13 @@ static long genwqe_ioctl(struct file *filp, unsigned int cmd,
 
 	case GENWQE_EXECUTE_RAW_DDCB: {
 
-		if (!capable(CAP_SYS_ADMIN)) {
-			dev_err(&pci_dev->dev,
-				"err: must be superuser execute raw DDCB!\n");
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-		}
+
 		return do_execute_ddcb(cfile, arg, 1);
 	}
 
 	default:
-		pr_err("unknown ioctl %x/%lx**\n", cmd, arg);
 		return -EINVAL;
 	}
 
@@ -1387,8 +1306,8 @@ int genwqe_device_create(struct genwqe_dev *cd)
 					    genwqe_attribute_groups,
 					    GENWQE_DEVNAME "%u_card",
 					    cd->card_idx);
-	if (cd->dev == NULL) {
-		rc = -ENODEV;
+	if (IS_ERR(cd->dev)) {
+		rc = PTR_ERR(cd->dev);
 		goto err_cdev;
 	}
 
