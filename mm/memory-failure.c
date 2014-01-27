@@ -611,7 +611,7 @@ static int me_pagecache_clean(struct page *p, unsigned long pfn)
 }
 
 /*
- * Dirty cache page page
+ * Dirty pagecache page
  * Issues: when the error hit a hole page the error is not properly
  * propagated.
  */
@@ -937,6 +937,16 @@ static int hwpoison_user_mappings(struct page *p, unsigned long pfn,
 
 				BUG_ON(!PageHWPoison(p));
 				return SWAP_FAIL;
+			}
+			/*
+			 * We pinned the head page for hwpoison handling,
+			 * now we split the thp and we are interested in
+			 * the hwpoisoned raw page, so move the refcount
+			 * to it.
+			 */
+			if (hpage != p) {
+				put_page(hpage);
+				get_page(p);
 			}
 			/* THP is split, so ppage should be the real poisoned page. */
 			ppage = p;
@@ -1575,7 +1585,13 @@ static int __soft_offline_page(struct page *page, int flags)
 		ret = migrate_pages(&pagelist, new_page, MPOL_MF_MOVE_ALL,
 					MIGRATE_SYNC, MR_MEMORY_FAILURE);
 		if (ret) {
-			putback_lru_pages(&pagelist);
+			if (!list_empty(&pagelist)) {
+				list_del(&page->lru);
+				dec_zone_page_state(page, NR_ISOLATED_ANON +
+						page_is_file_cache(page));
+				putback_lru_page(page);
+			}
+
 			pr_info("soft offline: %#lx: migration failed %d, type %lx\n",
 				pfn, ret, page->flags);
 			if (ret > 0)

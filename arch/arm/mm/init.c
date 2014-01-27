@@ -92,9 +92,6 @@ void show_mem(unsigned int filter)
 	printk("Mem-info:\n");
 	show_free_areas(filter);
 
-	if (filter & SHOW_MEM_FILTER_PAGE_COUNT)
-		return;
-
 	for_each_bank (i, mi) {
 		struct membank *bank = &mi->bank[i];
 		unsigned int pfn1, pfn2;
@@ -229,7 +226,7 @@ void __init setup_dma_zone(const struct machine_desc *mdesc)
 #ifdef CONFIG_ZONE_DMA
 	if (mdesc->dma_zone_size) {
 		arm_dma_zone_size = mdesc->dma_zone_size;
-		arm_dma_limit = __pv_phys_offset + arm_dma_zone_size - 1;
+		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
 	} else
 		arm_dma_limit = 0xffffffff;
 	arm_dma_pfn_limit = arm_dma_limit >> PAGE_SHIFT;
@@ -461,7 +458,7 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
 	 * free the section of the memmap array.
 	 */
 	if (pg < pgend)
-		free_bootmem(pg, pgend - pg);
+		memblock_free_early(pg, pgend - pg);
 }
 
 /*

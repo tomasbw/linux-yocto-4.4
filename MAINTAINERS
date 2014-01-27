@@ -484,7 +484,6 @@ M:	Hannes Reinecke <hare@suse.de>
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 F:	drivers/scsi/aic7xxx/
-F:	drivers/scsi/aic7xxx_old/
 
 AIMSLAB FM RADIO RECEIVER DRIVER
 M:	Hans Verkuil <hverkuil@xs4all.nl>
@@ -783,7 +782,7 @@ F:	arch/arm/boot/dts/sama*.dts
 F:	arch/arm/boot/dts/sama*.dtsi
 
 ARM/CALXEDA HIGHBANK ARCHITECTURE
-M:	Rob Herring <rob.herring@calxeda.com>
+M:	Rob Herring <robh@kernel.org>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
 F:	arch/arm/mach-highbank/
@@ -1368,6 +1367,9 @@ T:	git git://git.xilinx.com/linux-xlnx.git
 S:	Supported
 F:	arch/arm/mach-zynq/
 F:	drivers/cpuidle/cpuidle-zynq.c
+N:	zynq
+N:	xilinx
+F:	drivers/clocksource/cadence_ttc_timer.c
 
 ARM SMMU DRIVER
 M:	Will Deacon <will.deacon@arm.com>
@@ -2635,7 +2637,7 @@ DESIGNWARE USB2 DRD IP DRIVER
 M:	Paul Zimmerman <paulz@synopsys.com>
 L:	linux-usb@vger.kernel.org
 S:	Maintained
-F:	drivers/staging/dwc2/
+F:	drivers/usb/dwc2/
 
 DESIGNWARE USB3 DRD IP DRIVER
 M:	Felipe Balbi <balbi@ti.com>
@@ -2825,8 +2827,10 @@ F:	include/uapi/drm/
 
 INTEL DRM DRIVERS (excluding Poulsbo, Moorestown and derivative chipsets)
 M:	Daniel Vetter <daniel.vetter@ffwll.ch>
+M:	Jani Nikula <jani.nikula@linux.intel.com>
 L:	intel-gfx@lists.freedesktop.org
 L:	dri-devel@lists.freedesktop.org
+Q:	http://patchwork.freedesktop.org/project/intel-gfx/
 T:	git git://people.freedesktop.org/~danvet/drm-intel
 S:	Supported
 F:	drivers/gpu/drm/i915/
@@ -3630,6 +3634,7 @@ W:	http://en.wikipedia.org/wiki/F2FS
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jaegeuk/f2fs.git
 S:	Maintained
 F:	Documentation/filesystems/f2fs.txt
+F:	Documentation/ABI/testing/sysfs-fs-f2fs
 F:	fs/f2fs/
 F:	include/linux/f2fs_fs.h
 
@@ -4911,7 +4916,7 @@ F:	include/linux/sunrpc/
 F:	include/uapi/linux/sunrpc/
 
 KERNEL VIRTUAL MACHINE (KVM)
-M:	Gleb Natapov <gleb@redhat.com>
+M:	Gleb Natapov <gleb@kernel.org>
 M:	Paolo Bonzini <pbonzini@redhat.com>
 L:	kvm@vger.kernel.org
 W:	http://www.linux-kvm.org
@@ -5136,6 +5141,11 @@ F:	arch/x86/lguest/
 F:	drivers/lguest/
 F:	include/linux/lguest*.h
 F:	tools/lguest/
+
+LIBLOCKDEP
+M:	Sasha Levin <sasha.levin@oracle.com>
+S:	Maintained
+F:	tools/lib/lockdep/
 
 LINUX FOR IBM pSERIES (RS/6000)
 M:	Paul Mackerras <paulus@au.ibm.com>
@@ -6257,7 +6267,7 @@ F:	drivers/i2c/busses/i2c-ocores.c
 
 OPEN FIRMWARE AND FLATTENED DEVICE TREE
 M:	Grant Likely <grant.likely@linaro.org>
-M:	Rob Herring <rob.herring@calxeda.com>
+M:	Rob Herring <robh+dt@kernel.org>
 L:	devicetree@vger.kernel.org
 W:	http://fdt.secretlab.ca
 T:	git git://git.secretlab.ca/git/linux-2.6.git
@@ -6269,7 +6279,7 @@ K:	of_get_property
 K:	of_match_table
 
 OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-M:	Rob Herring <rob.herring@calxeda.com>
+M:	Rob Herring <robh+dt@kernel.org>
 M:	Pawel Moll <pawel.moll@arm.com>
 M:	Mark Rutland <mark.rutland@arm.com>
 M:	Ian Campbell <ijc+devicetree@hellion.org.uk>
@@ -6702,7 +6712,7 @@ F:	include/linux/timer*
 F:	kernel/*timer*
 
 POWER SUPPLY CLASS/SUBSYSTEM and DRIVERS
-M:	Anton Vorontsov <anton@enomsg.org>
+M:	Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 M:	David Woodhouse <dwmw2@infradead.org>
 T:	git git://git.infradead.org/battery-2.6.git
 S:	Maintained
@@ -6921,8 +6931,7 @@ S:	Maintained
 F:	drivers/scsi/qla1280.[ch]
 
 QLOGIC QLA2XXX FC-SCSI DRIVER
-M:	Andrew Vasquez <andrew.vasquez@qlogic.com>
-M:	linux-driver@qlogic.com
+M:	qla2xxx-upstream@qlogic.com
 L:	linux-scsi@vger.kernel.org
 S:	Supported
 F:	Documentation/scsi/LICENSE.qla2xxx
@@ -7094,6 +7103,12 @@ S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
 F:	Documentation/RCU/torture.txt
 F:	kernel/rcu/torture.c
+
+RCUTORTURE TEST FRAMEWORK
+M:	"Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+S:	Supported
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+F:	tools/testing/selftests/rcutorture
 
 RDC R-321X SoC
 M:	Florian Fainelli <florian@openwrt.org>
@@ -7476,8 +7491,9 @@ F:	include/scsi/srp.h
 SCSI SG DRIVER
 M:	Doug Gilbert <dgilbert@interlog.com>
 L:	linux-scsi@vger.kernel.org
-W:	http://www.torque.net/sg
+W:	http://sg.danny.cz/sg
 S:	Maintained
+F:	Documentation/scsi/scsi-generic.txt
 F:	drivers/scsi/sg.c
 F:	include/scsi/sg.h
 
@@ -8730,14 +8746,10 @@ S:	Odd fixes
 F:	drivers/media/usb/tm6000/
 
 TPM DEVICE DRIVER
-M:	Leonidas Da Silva Barbosa <leosilva@linux.vnet.ibm.com>
-M:	Ashley Lai <ashley@ashleylai.com>
 M:	Peter Huewe <peterhuewe@gmx.de>
-M:	Rajiv Andrade <mail@srajiv.net>
-W:	http://tpmdd.sourceforge.net
+M:	Ashley Lai <ashley@ashleylai.com>
 M:	Marcel Selhorst <tpmdd@selhorst.net>
-M:	Sirrix AG <tpmdd@sirrix.com>
-W:	http://www.sirrix.com
+W:	http://tpmdd.sourceforge.net
 L:	tpmdd-devel@lists.sourceforge.net (moderated for non-subscribers)
 S:	Maintained
 F:	drivers/char/tpm/
@@ -9227,6 +9239,7 @@ F:	include/media/videobuf2-*
 
 VIRTIO CONSOLE DRIVER
 M:	Amit Shah <amit.shah@redhat.com>
+L:	virtio-dev@lists.oasis-open.org
 L:	virtualization@lists.linux-foundation.org
 S:	Maintained
 F:	drivers/char/virtio_console.c
@@ -9236,6 +9249,7 @@ F:	include/uapi/linux/virtio_console.h
 VIRTIO CORE, NET AND BLOCK DRIVERS
 M:	Rusty Russell <rusty@rustcorp.com.au>
 M:	"Michael S. Tsirkin" <mst@redhat.com>
+L:	virtio-dev@lists.oasis-open.org
 L:	virtualization@lists.linux-foundation.org
 S:	Maintained
 F:	drivers/virtio/
@@ -9248,6 +9262,7 @@ F:	include/uapi/linux/virtio_*.h
 VIRTIO HOST (VHOST)
 M:	"Michael S. Tsirkin" <mst@redhat.com>
 L:	kvm@vger.kernel.org
+L:	virtio-dev@lists.oasis-open.org
 L:	virtualization@lists.linux-foundation.org
 L:	netdev@vger.kernel.org
 S:	Maintained
@@ -9545,6 +9560,7 @@ M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Boris Ostrovsky <boris.ostrovsky@oracle.com>
 M:	David Vrabel <david.vrabel@citrix.com>
 L:	xen-devel@lists.xenproject.org (moderated for non-subscribers)
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git
 S:	Supported
 F:	arch/x86/xen/
 F:	drivers/*/xen-*front.c
