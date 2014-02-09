@@ -17,7 +17,6 @@
 #include <linux/pci.h>
 #include <linux/jiffies.h>
 #include <linux/delay.h>
-
 #include <linux/kthread.h>
 
 #include <linux/mei.h>
@@ -28,12 +27,11 @@
 #include "hbm.h"
 
 /**
- * mei_txe_reg_read - Reads 32bit data from the mei device
+ * mei_txe_reg_read - Reads 32bit data from the device
  *
  * @base_addr: registers base address
  * @offset: register offset
  *
- * returns register value
  */
 static inline u32 mei_txe_reg_read(void __iomem *base_addr,
 					unsigned long offset)
@@ -42,7 +40,7 @@ static inline u32 mei_txe_reg_read(void __iomem *base_addr,
 }
 
 /**
- * mei_txe_reg_write - Writes 32bit data to the mei device
+ * mei_txe_reg_write - Writes 32bit data to the device
  *
  * @base_addr: registers base address
  * @offset: register offset
@@ -56,12 +54,11 @@ static inline void mei_txe_reg_write(void __iomem *base_addr,
 
 /**
  * mei_txe_sec_reg_read_silent - Reads 32bit data from the SeC BAR
- *  doesn't check for aliveness
  *
  * @dev: the device structure
  * @offset: register offset
  *
- * returns register value
+ * Doesn't check for aliveness while Reads 32bit data from the SeC BAR
  */
 static inline u32 mei_txe_sec_reg_read_silent(struct mei_txe_hw *hw,
 				unsigned long offset)
@@ -75,17 +72,12 @@ static inline u32 mei_txe_sec_reg_read_silent(struct mei_txe_hw *hw,
  * @dev: the device structure
  * @offset: register offset
  *
- * returns register value
+ * Reads 32bit data from the SeC BAR and shout loud if aliveness is not set
  */
 static inline u32 mei_txe_sec_reg_read(struct mei_txe_hw *hw,
 				unsigned long offset)
 {
-	struct mei_device *dev = hw_txe_to_mei(hw);
-
 	WARN(!hw->aliveness, "sec read: aliveness not asserted\n");
-	if (!hw->aliveness)
-		dev_warn(&dev->pdev->dev, "aliveness not asserted\n");
-
 	return mei_txe_sec_reg_read_silent(hw, offset);
 }
 /**
@@ -95,6 +87,8 @@ static inline u32 mei_txe_sec_reg_read(struct mei_txe_hw *hw,
  * @dev: the device structure
  * @offset: register offset
  * @value: value to write
+ *
+ * Doesn't check for aliveness while writes 32bit data from to the SeC BAR
  */
 static inline void mei_txe_sec_reg_write_silent(struct mei_txe_hw *hw,
 				unsigned long offset, u32 value)
@@ -108,16 +102,13 @@ static inline void mei_txe_sec_reg_write_silent(struct mei_txe_hw *hw,
  * @dev: the device structure
  * @offset: register offset
  * @value: value to write
+ *
+ * Writes 32bit data from the SeC BAR and shout loud if aliveness is not set
  */
 static inline void mei_txe_sec_reg_write(struct mei_txe_hw *hw,
 				unsigned long offset, u32 value)
 {
-
-	struct mei_device *dev = hw_txe_to_mei(hw);
-
 	WARN(!hw->aliveness, "sec write: aliveness not asserted\n");
-	if (!hw->aliveness)
-		dev_warn(&dev->pdev->dev, "aliveness not asserted\n");
 	mei_txe_sec_reg_write_silent(hw, offset, value);
 }
 /**
@@ -126,7 +117,6 @@ static inline void mei_txe_sec_reg_write(struct mei_txe_hw *hw,
  * @hw: the device structure
  * @offset: offset from which to read the data
  *
- * returns the byte read.
  */
 static inline u32 mei_txe_br_reg_read(struct mei_txe_hw *hw,
 				unsigned long offset)
@@ -149,9 +139,14 @@ static inline void mei_txe_br_reg_write(struct mei_txe_hw *hw,
 
 /**
  * mei_txe_aliveness_set - request for aliveness change
-	requires device lock to be held
+ *
  * @dev: the device structure
  * @req: requested aliveness value
+ *
+ * Request for aliveness change and returns true if the change is
+ *   really needed and false if aliveness is already
+ *   in the requested state
+ * Requires device lock to be held
  */
 static bool mei_txe_aliveness_set(struct mei_device *dev, u32 req)
 {
@@ -170,9 +165,12 @@ static bool mei_txe_aliveness_set(struct mei_device *dev, u32 req)
 
 
 /**
- * mei_txe_aliveness_req_get - get aliveness requested value
- *	Reads and returns the HICR_HOST_ALIVENESS_REQ register value
+ * mei_txe_aliveness_req_get - get aliveness requested register value
+ *
  * @dev: the device structure
+ *
+ * Extract HICR_HOST_ALIVENESS_RESP_ACK bit from
+ * from HICR_HOST_ALIVENESS_REQ register value
  */
 static u32 mei_txe_aliveness_req_get(struct mei_device *dev)
 {
@@ -181,10 +179,13 @@ static u32 mei_txe_aliveness_req_get(struct mei_device *dev)
 	reg = mei_txe_br_reg_read(hw, SICR_HOST_ALIVENESS_REQ_REG);
 	return reg & SICR_HOST_ALIVENESS_REQ_REQUESTED;
 }
+
 /**
- * mei_txe_aliveness_get - get aliveness response
- *	Reads and returns the HICR_HOST_ALIVENESS_RESP register value
+ * mei_txe_aliveness_get - get aliveness response register value
  * @dev: the device structure
+ *
+ * Extract HICR_HOST_ALIVENESS_RESP_ACK bit
+ * from HICR_HOST_ALIVENESS_RESP register value
  */
 static u32 mei_txe_aliveness_get(struct mei_device *dev)
 {
@@ -195,12 +196,13 @@ static u32 mei_txe_aliveness_get(struct mei_device *dev)
 }
 
 /**
- * mei_txe_aliveness_poll
- *	Polls for HICR_HOST_ALIVENESS_RESP.ALIVENESS_RESP to be set
+ * mei_txe_aliveness_poll - waits for aliveness to settle
  *
  * @dev: the device structure
  * @expected: expected aliveness value
- * return: true if the expected value was received
+ *
+ * Polls for HICR_HOST_ALIVENESS_RESP.ALIVENESS_RESP to be set
+ * returns > 0 if the expected value was received, -ETIME otherwise
  */
 static int mei_txe_aliveness_poll(struct mei_device *dev, u32 expected)
 {
@@ -225,12 +227,13 @@ static int mei_txe_aliveness_poll(struct mei_device *dev, u32 expected)
 }
 
 /**
- * mei_txe_aliveness_wait
- *	Waits for HICR_HOST_ALIVENESS_RESP.ALIVENESS_RESP to be set
+ * mei_txe_aliveness_wait - waits for aliveness to settle
  *
  * @dev: the device structure
  * @expected: expected aliveness value
- * return: returns 0 on success error otherwise
+ *
+ * Waits for HICR_HOST_ALIVENESS_RESP.ALIVENESS_RESP to be set
+ * returns returns 0 on success and < 0 otherwise
  */
 static int mei_txe_aliveness_wait(struct mei_device *dev, u32 expected)
 {
@@ -265,7 +268,8 @@ static int mei_txe_aliveness_wait(struct mei_device *dev, u32 expected)
  * mei_txe_aliveness_set_sync - sets an wait for aliveness to complete
  *
  * @dev: the device structure
- * return: returns 0 on success en error otherwise
+ *
+ * returns returns 0 on success and < 0 otherwise
  */
 int mei_txe_aliveness_set_sync(struct mei_device *dev, u32 req)
 {
@@ -368,6 +372,9 @@ static void mei_txe_intr_enable(struct mei_device *dev)
  *	only Aliveness, Input ready, and output doorbell are of relevance
  *
  * @dev: the device structure
+ *
+ * Checks if there are pending interrupts
+ * only Aliveness, Readiness, Input ready, and Output doorbell are relevant
  */
 static bool mei_txe_pending_interrupts(struct mei_device *dev)
 {
@@ -406,13 +413,13 @@ static void mei_txe_input_payload_write(struct mei_device *dev,
 }
 
 /**
- * mei_txe_out_data_read - read a dword from the device buffer
+ * mei_txe_out_data_read - read dword from the device buffer
  *	at offset idx
  *
  * @dev: the device structure
  * @idx: index in the device buffer
  *
- * returns: register value at index
+ * returns register value at index
  */
 static u32 mei_txe_out_data_read(const struct mei_device *dev,
 					unsigned long idx)
@@ -499,21 +506,21 @@ static inline bool mei_txe_host_is_ready(struct mei_device *dev)
  * mei_txe_readiness_wait - wait till readiness settles
  *
  * @dev: the device structure
+ *
+ * returns 0 on success and -ETIME on timeout
  */
 static int mei_txe_readiness_wait(struct mei_device *dev)
 {
-	int err;
 	if (mei_txe_hw_is_ready(dev))
 		return 0;
+
 	mutex_unlock(&dev->device_lock);
-	err = wait_event_interruptible_timeout(dev->wait_hw_ready,
-			dev->recvd_hw_ready,
+	wait_event_timeout(dev->wait_hw_ready, dev->recvd_hw_ready,
 			msecs_to_jiffies(SEC_RESET_WAIT_TIMEOUT));
 	mutex_lock(&dev->device_lock);
-	if (!err && !dev->recvd_hw_ready) {
-		dev_dbg(&dev->pdev->dev,
-			"wait for readiness failed: status = 0x%x\n", err);
-		return -ETIMEDOUT;
+	if (!dev->recvd_hw_ready) {
+		dev_err(&dev->pdev->dev, "wait for readiness failed\n");
+		return -ETIME;
 	}
 
 	dev->recvd_hw_ready = false;
@@ -521,10 +528,12 @@ static int mei_txe_readiness_wait(struct mei_device *dev)
 }
 
 /**
- *  mei_txe_hw_config - configure hardware at the start
- *	of the device. This happens only at the probe time
+ *  mei_txe_hw_config - configure hardware at the start of the devices
  *
  * @dev: the device structure
+ *
+ * Configure hardware at the start of the device should be done only
+ *   once at the device probe time
  */
 static void mei_txe_hw_config(struct mei_device *dev)
 {
@@ -542,7 +551,7 @@ static void mei_txe_hw_config(struct mei_device *dev)
 
 
 /**
- * mei_txe_write - writes a message to mei device.
+ * mei_txe_write - writes a message to device.
  *
  * @dev: the device structure
  * @header: header of message
@@ -621,12 +630,18 @@ static size_t mei_txe_hbuf_max_len(const struct mei_device *dev)
  *
  * returns always hbuf_depth
  */
-
 static int mei_txe_hbuf_empty_slots(struct mei_device *dev)
 {
 	return dev->hbuf_depth;
 }
 
+/**
+ * mei_txe_count_full_read_slots - mimics the me device circular buffer
+ *
+ * @dev: the device structure
+ *
+ * returns always buffer size in dwords count
+ */
 static int mei_txe_count_full_read_slots(struct mei_device *dev)
 {
 	/* read buffers has static size */
@@ -638,7 +653,7 @@ static int mei_txe_count_full_read_slots(struct mei_device *dev)
  *
  * @dev: the device structure
  *
- * returns: mei message header
+ * returns mei message header
  */
 
 static u32 mei_txe_read_hdr(const struct mei_device *dev)
@@ -651,6 +666,8 @@ static u32 mei_txe_read_hdr(const struct mei_device *dev)
  * @dev: the device structure
  * @buf: message buffer will be written
  * @len: message size will be read
+ *
+ * returns -EINVAL on error wrong argument and 0 on success
  */
 static int mei_txe_read(struct mei_device *dev,
 		unsigned char *buf, unsigned long len)
@@ -689,6 +706,8 @@ static int mei_txe_read(struct mei_device *dev,
  *
  * @dev: the device structure
  * @intr_enable: if interrupt should be enabled after reset.
+ *
+ * returns 0 on success and < 0 in case of error
  */
 static int mei_txe_hw_reset(struct mei_device *dev, bool intr_enable)
 {
@@ -743,6 +762,8 @@ static int mei_txe_hw_reset(struct mei_device *dev, bool intr_enable)
  * mei_txe_hw_start - start the hardware after reset
  *
  * @dev: the device structure
+ *
+ * returns 0 on success and < 0 in case of error
  */
 static int mei_txe_hw_start(struct mei_device *dev)
 {
@@ -756,8 +777,7 @@ static int mei_txe_hw_start(struct mei_device *dev)
 
 	ret = mei_txe_readiness_wait(dev);
 	if (ret < 0) {
-		dev_err(&dev->pdev->dev,
-			"wating for readiness failed\n");
+		dev_err(&dev->pdev->dev, "wating for readiness failed\n");
 		return ret;
 	}
 
@@ -773,8 +793,7 @@ static int mei_txe_hw_start(struct mei_device *dev)
 
 	ret = mei_txe_aliveness_set_sync(dev, 1);
 	if (ret < 0) {
-		dev_err(&dev->pdev->dev,
-			"wait for aliveness failed ... bailing out\n");
+		dev_err(&dev->pdev->dev, "wait for aliveness failed ... bailing out\n");
 		return ret;
 	}
 
@@ -924,7 +943,7 @@ irqreturn_t mei_txe_irq_thread_handler(int irq, void *dev_id)
 
 			}
 		}
-		wake_up_interruptible(&dev->wait_hw_ready);
+		wake_up(&dev->wait_hw_ready);
 	}
 
 	/************************************************************/

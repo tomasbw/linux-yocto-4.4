@@ -18,13 +18,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110,
- * USA
- *
  * The full GNU General Public License is included in this distribution
- * in the file called LICENSE.GPL.
+ * in the file called COPYING
  *
  * Contact Information:
  *	Intel Corporation.
@@ -33,7 +28,7 @@
  *
  * BSD LICENSE
  *
- * Copyright(c) 2003 - 2012 Intel Corporation. All rights reserved.
+ * Copyright(c) 2013 - 2014 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
