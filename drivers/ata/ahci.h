@@ -236,6 +236,8 @@ enum {
 						        port start (wait until
 						        error-handling stage) */
 	AHCI_HFLAG_MULTI_MSI		= (1 << 16), /* multiple PCI MSIs */
+	AHCI_HFLAG_NO_DEVSLP		= (1 << 17), /* no device sleep */
+	AHCI_HFLAG_NO_FBS		= (1 << 18), /* no FBS */
 
 	/* ap->flags bits */
 
