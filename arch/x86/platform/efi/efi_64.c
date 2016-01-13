@@ -141,6 +141,11 @@ void efi_sync_low_kernel_mappings(void)
 		sizeof(pgd_t) * num_pgds);
 }
 
+pgd_t *efi_get_pgd(void)
+{
+	return __va(efi_scratch.efi_pgt);
+}
+
 int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 {
 	unsigned long text;
