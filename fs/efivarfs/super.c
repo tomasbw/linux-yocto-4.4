@@ -158,17 +158,19 @@ static int efivarfs_callback(efi_char16_t *name16, efi_guid_t vendor,
 		goto fail_inode;
 	}
 
-	/* copied by the above to local storage in the dentry. */
-	kfree(name);
-
 	efivar_entry_size(entry, &size);
-	efivar_entry_add(entry, &efivarfs_list);
+	err = efivar_entry_add(entry, &efivarfs_list);
+	if (err)
+		goto fail_inode;
 
 	mutex_lock(&inode->i_mutex);
 	inode->i_private = entry;
 	i_size_write(inode, size + sizeof(entry->var.Attributes));
 	mutex_unlock(&inode->i_mutex);
 	d_add(dentry, inode);
+
+	/* copied by the above to local storage in the dentry. */
+	kfree(name);
 
 	return 0;
 

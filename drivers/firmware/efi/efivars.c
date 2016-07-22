@@ -510,7 +510,8 @@ static ssize_t efivar_delete(struct file *filp, struct kobject *kobj,
 		vendor = del_var->VendorGuid;
 	}
 
-	efivar_entry_iter_begin();
+	if (efivar_entry_iter_begin())
+		return -EINTR;
 	entry = efivar_entry_find(name, vendor, &efivar_sysfs_list, true);
 	if (!entry)
 		err = -EINVAL;
@@ -575,7 +576,8 @@ efivar_create_sysfs_entry(struct efivar_entry *new_var)
 		return ret;
 
 	kobject_uevent(&new_var->kobj, KOBJ_ADD);
-	efivar_entry_add(new_var, &efivar_sysfs_list);
+	if (efivar_entry_add(new_var, &efivar_sysfs_list))
+		return 1;
 
 	return 0;
 }
@@ -690,9 +692,11 @@ static int efivars_sysfs_callback(efi_char16_t *name, efi_guid_t vendor,
 
 static int efivar_sysfs_destroy(struct efivar_entry *entry, void *data)
 {
-	efivar_entry_remove(entry);
+	int err = 0;
+
+	err = efivar_entry_remove(entry);
 	efivar_unregister(entry);
-	return 0;
+	return err;
 }
 
 static void efivars_sysfs_exit(void)
