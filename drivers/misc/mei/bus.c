@@ -126,7 +126,8 @@ ssize_t __mei_cl_recv(struct mei_cl *cl, u8 *buf, size_t length)
 		goto out;
 
 	/* wait on event only if there is no other waiter */
-	if (list_empty(&cl->rd_completed) && !waitqueue_active(&cl->rx_wait)) {
+	/* synchronized under device mutex */
+	if (!waitqueue_active(&cl->rx_wait)) {
 
 		mutex_unlock(&bus->device_lock);
 
@@ -142,7 +143,7 @@ ssize_t __mei_cl_recv(struct mei_cl *cl, u8 *buf, size_t length)
 		mutex_lock(&bus->device_lock);
 
 		if (!mei_cl_is_connected(cl)) {
-			rets = -EBUSY;
+			rets = -ENODEV;
 			goto out;
 		}
 	}
@@ -234,7 +235,7 @@ static void mei_cl_bus_event_work(struct work_struct *work)
 	/* Prepare for the next read */
 	if (cldev->events_mask & BIT(MEI_CL_EVENT_RX)) {
 		mutex_lock(&bus->device_lock);
-		mei_cl_read_start(cldev->cl, 0, NULL);
+		mei_cl_read_start(cldev->cl, mei_cl_mtu(cldev->cl), NULL);
 		mutex_unlock(&bus->device_lock);
 	}
 }
